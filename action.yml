@@ -1,0 +1,323 @@
+name: Locally setup
+description: Install the Locally CLI, prepare TLS material, install plugins, and start `locally ci`.
+
+inputs:
+  version:
+    description: CLI version. Use "latest" or a pinned version (e.g. "v2026.09").
+    default: latest
+  team-uuid:
+    description: "Locally team UUID (from account.locally.build). Mutually exclusive with user-uuid; exactly one must be set."
+    default: ''
+  user-uuid:
+    description: "Locally user UUID (from account.locally.build). Mutually exclusive with team-uuid; exactly one must be set."
+    default: ''
+  plugins:
+    description: |
+      Which plugin set to install. One of:
+        none        — install nothing
+        recommended — install the recommended set (default)
+        all         — install every available plugin
+        custom      — install the explicit list passed in `plugins-list`
+    default: 'recommended'
+  plugins-list:
+    description: |
+      Comma- or newline-separated list of plugin namespaces (e.g.
+      `Microsoft.ServiceBus,Microsoft.Storage`). Required when `plugins=custom`;
+      must be empty for any other value of `plugins`.
+    default: ''
+  start:
+    description: Whether to generate TLS material, install plugins, and start `locally ci`.
+    default: 'true'
+  cache:
+    description: Whether to cache the plugin directory between runs.
+    default: 'true'
+  cache-key-prefix:
+    description: Optional prefix on the cache key (e.g. to force fresh cache or isolate per-branch).
+    default: ''
+  expected-checksum:
+    description: |
+      Optional SHA-256 hex digest to verify the downloaded CLI tarball against.
+      When set, the action verifies the local hash matches this value and ignores
+      the archive checksum from get.locally.build's `/archive-sha256` endpoint.
+      Set this when you want to anchor trust to a hash you've verified
+      out-of-band rather than to whatever the release pipeline emits.
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Validate runner OS
+      shell: bash
+      run: |
+        case "$RUNNER_OS" in
+          Linux|macOS|Windows) ;;
+          *)
+            echo "::error::Locally setup supports Linux, macOS, and Windows runners (got $RUNNER_OS)."
+            exit 1
+            ;;
+        esac
+
+    - name: Resolve CLI version
+      id: version
+      shell: bash
+      env:
+        REQUESTED_VERSION: ${{ inputs.version }}
+      run: |
+        set -uo pipefail
+        if [ "$REQUESTED_VERSION" != "latest" ]; then
+          echo "Using pinned version $REQUESTED_VERSION"
+          echo "version=$REQUESTED_VERSION" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        url="https://get.locally.build/v1/cli/latest/version"
+        body_file="$(mktemp)"
+        echo "Resolving 'latest' from $url"
+        http_code="$(curl -sSL -A "setup-locally/1.0.0" --max-time 30 --retry 2 --retry-delay 2 -o "$body_file" -w '%{http_code}' "$url")"
+        rc=$?
+        body="$(cat "$body_file" 2>/dev/null || true)"
+        rm -f "$body_file"
+
+        echo "curl exit=$rc, HTTP $http_code, body=$(printf '%q' "$body")"
+
+        if [ "$rc" -ne 0 ]; then
+          echo "::error::curl failed (exit $rc) reaching $url. Specify a pinned 'version' input as a workaround."
+          exit 1
+        fi
+        if [ "$http_code" != "200" ]; then
+          echo "::error::$url returned HTTP $http_code. Specify a pinned 'version' input as a workaround."
+          exit 1
+        fi
+
+        resolved="$(printf '%s' "$body" | tr -d '[:space:]')"
+        if [ -z "$resolved" ]; then
+          echo "::error::$url returned 200 with empty body. Specify a pinned 'version' input as a workaround."
+          exit 1
+        fi
+
+        echo "Resolved 'latest' to $resolved"
+        echo "version=$resolved" >> "$GITHUB_OUTPUT"
+
+    - name: Hash plugins input
+      id: plugins-hash
+      shell: bash
+      env:
+        PLUGINS: ${{ inputs.plugins }}
+        PLUGINS_LIST: ${{ inputs.plugins-list }}
+      run: |
+        hash="$(printf '%s\n%s' "$PLUGINS" "$PLUGINS_LIST" | sha256sum | awk '{print $1}' | head -c 12)"
+        echo "hash=$hash" >> "$GITHUB_OUTPUT"
+
+    - name: Set environment paths
+      shell: bash
+      env:
+        TEAM_UUID: ${{ inputs.team-uuid }}
+        USER_UUID: ${{ inputs.user-uuid }}
+      run: |
+        set -euo pipefail
+        if [ -z "${TEAM_UUID:-}" ] && [ -z "${USER_UUID:-}" ]; then
+          echo "::error::exactly one of team-uuid or user-uuid is required" >&2
+          exit 1
+        fi
+        if [ -n "${TEAM_UUID:-}" ] && [ -n "${USER_UUID:-}" ]; then
+          echo "::error::team-uuid and user-uuid are mutually exclusive (set only one)" >&2
+          exit 1
+        fi
+        wd="$RUNNER_TEMP/locally"
+        plugin_dir="$RUNNER_TEMP/locally-plugins"
+        mkdir -p "$wd" "$plugin_dir"
+        {
+          echo "LOCALLY_WORKING_DIRECTORY=$wd"
+          echo "LOCALLY_TLS_CA_FILE_PATH=$wd/ca.pem"
+          echo "LOCALLY_TLS_CERT_FILE_PATH=$wd/localhost.crt"
+          echo "LOCALLY_TLS_KEY_FILE_PATH=$wd/localhost.key"
+          echo "LOCALLY_PLUGIN_DIRECTORY=$plugin_dir"
+          if [ -n "${TEAM_UUID:-}" ]; then
+            echo "LOCALLY_TEAM_UUID=$TEAM_UUID"
+          else
+            echo "LOCALLY_USER_UUID=$USER_UUID"
+          fi
+        } >> "$GITHUB_ENV"
+
+    - name: Restore plugin cache
+      if: inputs.cache == 'true' && inputs.start == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/locally-plugins
+        key: locally-plugins-${{ runner.os }}-${{ runner.arch }}-cli-${{ steps.version.outputs.version }}-${{ inputs.cache-key-prefix }}-${{ steps.plugins-hash.outputs.hash }}-${{ github.run_id }}
+        restore-keys: |
+          locally-plugins-${{ runner.os }}-${{ runner.arch }}-cli-${{ steps.version.outputs.version }}-${{ inputs.cache-key-prefix }}-${{ steps.plugins-hash.outputs.hash }}-
+
+    - name: Download CLI
+      shell: bash
+      env:
+        VERSION: ${{ steps.version.outputs.version }}
+        EXPECTED_CHECKSUM: ${{ inputs.expected-checksum }}
+      run: |
+        set -euo pipefail
+        version="$VERSION"
+        case "$RUNNER_OS" in
+          Linux)   os=linux ;;
+          macOS)   os=darwin ;;
+          Windows) os=windows ;;
+        esac
+        case "$RUNNER_ARCH" in
+          X64)   arch=amd64 ;;
+          ARM64) arch=arm64 ;;
+          *)
+            echo "::error::Unsupported runner architecture: $RUNNER_ARCH"
+            exit 1
+            ;;
+        esac
+        url="https://get.locally.build/v1/cli/${version}/${os}/${arch}"
+
+        cli_dir="$RUNNER_TEMP/locally-cli"
+        mkdir -p "$cli_dir"
+        cd "$cli_dir"
+
+        curl -fsSL -A "setup-locally/1.0.0" -o locally.tar.gz "$url"
+
+        # Choose the expected checksum source: an explicit input (verified
+        # out-of-band by the consumer) takes precedence over the archive
+        # checksum fetched from the same origin as the binary. We verify the
+        # downloaded .tar.gz, so we compare against the archive checksum
+        # (/archive-sha256) rather than /sha256, which is the binary's hash.
+        if [ -n "$EXPECTED_CHECKSUM" ]; then
+          expected="$EXPECTED_CHECKSUM"
+          echo "Verifying against expected-checksum input"
+        else
+          curl -fsSL -A "setup-locally/0.1" -o locally.tar.gz.sha256 "${url}/archive-sha256"
+          expected="$(awk '{print $1}' locally.tar.gz.sha256)"
+          echo "Verifying against archive-sha256 (no expected-checksum input)"
+        fi
+
+        actual="$(shasum -a 256 locally.tar.gz | awk '{print $1}')"
+        if [ "$expected" != "$actual" ]; then
+          echo "::error::CLI checksum mismatch (expected $expected, got $actual)"
+          exit 1
+        fi
+
+        tar -xzf locally.tar.gz --no-same-owner --no-same-permissions
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          chmod +x locally.exe 2>/dev/null || true
+        else
+          chmod +x locally
+        fi
+        echo "$cli_dir" >> "$GITHUB_PATH"
+
+    - name: Verify CLI install
+      shell: bash
+      run: locally version
+
+    - name: Generate TLS material
+      if: inputs.start == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd "$LOCALLY_WORKING_DIRECTORY"
+
+        openssl genrsa -out ca.key 4096
+        chmod 600 ca.key
+        # Python's ssl module (used by Azure CLI) rejects CA certs without an
+        # explicit keyCertSign KeyUsage with "CA cert does not include key
+        # usage extension". Add basicConstraints + keyUsage explicitly.
+        openssl req -x509 -new -nodes -key ca.key -sha256 -days 1 \
+          -out ca.pem -subj "/CN=Locally Test CA" \
+          -addext "basicConstraints=critical,CA:TRUE" \
+          -addext "keyUsage=critical,keyCertSign,cRLSign"
+
+        domains="$(locally certificate get-required-domains)"
+        if [ -z "$domains" ]; then
+          echo "::error::locally certificate get-required-domains returned no domains"
+          exit 1
+        fi
+
+        cat > san.cnf <<'EOF'
+        [req]
+        distinguished_name = req_distinguished_name
+        req_extensions = req_ext
+        prompt = no
+        [req_distinguished_name]
+        CN = localhost
+        [req_ext]
+        subjectAltName = @alt_names
+        [alt_names]
+        EOF
+
+        i=1
+        while IFS= read -r d || [ -n "$d" ]; do
+          d="$(printf '%s' "$d" | tr -d '[:space:]')"
+          [ -n "$d" ] || continue
+          echo "DNS.$i = $d" >> san.cnf
+          i=$((i+1))
+        done < <(printf '%s' "$domains" | tr ',' '\n')
+        echo "IP.1 = 127.0.0.1" >> san.cnf
+
+        openssl genrsa -out localhost.key 4096
+        chmod 600 localhost.key
+        openssl req -new -key localhost.key -out localhost.csr -config san.cnf
+        openssl x509 -req -in localhost.csr -CA ca.pem -CAkey ca.key \
+          -CAcreateserial -out localhost.crt -days 1 -sha256 \
+          -extensions req_ext -extfile san.cnf
+
+    - name: Validate plugins inputs
+      shell: bash
+      env:
+        PLUGINS: ${{ inputs.plugins }}
+        PLUGINS_LIST: ${{ inputs.plugins-list }}
+      run: |
+        set -euo pipefail
+        case "$PLUGINS" in
+          none|recommended|all|custom) ;;
+          *)
+            echo "::error::plugins must be one of: none, recommended, all, custom (got '$PLUGINS')" >&2
+            exit 1
+            ;;
+        esac
+        if [ "$PLUGINS" = "custom" ] && [ -z "${PLUGINS_LIST:-}" ]; then
+          echo "::error::plugins-list is required when plugins=custom" >&2
+          exit 1
+        fi
+        # Reject lists that contain only separators/whitespace — the loop would
+        # otherwise iterate over blank entries and exit 0 having installed nothing.
+        if [ "$PLUGINS" = "custom" ] && ! printf '%s' "$PLUGINS_LIST" | grep -q '[^[:space:],]'; then
+          echo "::error::plugins-list contains no plugin names (got '$PLUGINS_LIST')" >&2
+          exit 1
+        fi
+        if [ "$PLUGINS" != "custom" ] && [ -n "${PLUGINS_LIST:-}" ]; then
+          echo "::error::plugins-list must be empty unless plugins=custom (got plugins='$PLUGINS', plugins-list non-empty)" >&2
+          exit 1
+        fi
+
+    # Delegated to the install-plugins sister action so the bash lives in one
+    # place and consumers can call it standalone (e.g. to install additional
+    # plugins later in a workflow). install-plugins itself fast-returns when
+    # plugins is `none`.
+    - name: Install plugins
+      if: inputs.start == 'true'
+      uses: locallybuild/setup-locally/install-plugins@v1
+      with:
+        plugins: ${{ inputs.plugins }}
+        plugins-list: ${{ inputs.plugins-list }}
+        team-uuid: ${{ inputs.team-uuid }}
+        user-uuid: ${{ inputs.user-uuid }}
+
+    - name: Start `locally ci`
+      if: inputs.start == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        nohup locally ci > "$LOCALLY_WORKING_DIRECTORY/ci.log" 2>&1 &
+        echo $! > "$LOCALLY_WORKING_DIRECTORY/ci.pid"
+
+        for _ in $(seq 1 60); do
+          if curl -fsSk -A "setup-locally/1.0.0" https://127.0.0.1:5674/_locally/ci/endpoints > /dev/null 2>&1; then
+            echo "Locally CI is ready"
+            exit 0
+          fi
+          sleep 2
+        done
+
+        echo "::error::Locally CI did not become ready within 120s"
+        cat "$LOCALLY_WORKING_DIRECTORY/ci.log" >&2 || true
+        exit 1

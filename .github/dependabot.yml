@@ -1,0 +1,17 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    # Cover the workflows directory plus every action.yml in the repo —
+    # Dependabot only scans the root action.yml by default, so the nested
+    # composite actions need to be listed explicitly.
+    directories:
+      - "/"
+      - "/teardown"
+      - "/install-plugins"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore(deps)
+    labels:
+      - dependencies
+      - github-actions

@@ -1,0 +1,9 @@
+setup-locally
+Copyright 2026 Locally Build
+
+Licensed under the Apache License, Version 2.0.
+
+This action installs and runs the Locally CLI, which is distributed
+under separate terms. By using this action you agree to the Locally
+CLI Terms and Conditions:
+https://locally.build/legal/locally-cli-terms-and-conditions

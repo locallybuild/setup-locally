@@ -1,0 +1,120 @@
+name: Locally install plugins
+description: |
+  Install Locally Resource Provider plugins via `locally plugin install`.
+  Accepts a mix of namespace names (e.g. Microsoft.ServiceBus) and the bare
+  set keywords `recommended` or `all`. Use `none` (or leave empty) to skip
+  install entirely.
+
+  Requires `locally` to be on PATH and an OIDC environment to be configured
+  — typically by running `locallybuild/setup-locally` first. Standalone
+  callers must set LOCALLY_WORKING_DIRECTORY, LOCALLY_PLUGIN_DIRECTORY,
+  and exactly one of LOCALLY_TEAM_UUID or LOCALLY_USER_UUID (or pass the
+  matching team-uuid / user-uuid input) themselves.
+
+inputs:
+  plugins:
+    description: |
+      Which plugin set to install. One of:
+        none        — install nothing
+        recommended — install the recommended set
+        all         — install every available plugin
+        custom      — install the explicit list passed in `plugins-list`
+    default: 'none'
+  plugins-list:
+    description: |
+      Comma- or newline-separated list of plugin namespaces (e.g.
+      `Microsoft.ServiceBus,Microsoft.Storage`). Required when `plugins=custom`;
+      must be empty for any other value of `plugins`.
+    default: ''
+  team-uuid:
+    description: "Locally team UUID. Optional — falls back to the LOCALLY_TEAM_UUID env var when blank. Mutually exclusive with user-uuid."
+    default: ''
+  user-uuid:
+    description: "Locally user UUID. Optional — falls back to the LOCALLY_USER_UUID env var when blank. Mutually exclusive with team-uuid."
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Install plugins
+      shell: bash
+      env:
+        PLUGINS: ${{ inputs.plugins }}
+        PLUGINS_LIST: ${{ inputs.plugins-list }}
+        TEAM_UUID_INPUT: ${{ inputs.team-uuid }}
+        USER_UUID_INPUT: ${{ inputs.user-uuid }}
+      run: |
+        set -euo pipefail
+
+        # Allow team / user UUID to come from input or be inherited from env.
+        if [ -n "$TEAM_UUID_INPUT" ]; then
+          export LOCALLY_TEAM_UUID="$TEAM_UUID_INPUT"
+        fi
+        if [ -n "$USER_UUID_INPUT" ]; then
+          export LOCALLY_USER_UUID="$USER_UUID_INPUT"
+        fi
+
+        # Validate plugins / plugins-list combination.
+        case "$PLUGINS" in
+          none|recommended|all|custom) ;;
+          *)
+            echo "::error::plugins must be one of: none, recommended, all, custom (got '$PLUGINS')" >&2
+            exit 1
+            ;;
+        esac
+        if [ "$PLUGINS" = "custom" ] && [ -z "${PLUGINS_LIST:-}" ]; then
+          echo "::error::plugins-list is required when plugins=custom" >&2
+          exit 1
+        fi
+        # Reject lists that contain only separators/whitespace — the loop would
+        # otherwise iterate over blank entries and exit 0 having installed nothing.
+        if [ "$PLUGINS" = "custom" ] && ! printf '%s' "$PLUGINS_LIST" | grep -q '[^[:space:],]'; then
+          echo "::error::plugins-list contains no plugin names (got '$PLUGINS_LIST')" >&2
+          exit 1
+        fi
+        if [ "$PLUGINS" != "custom" ] && [ -n "${PLUGINS_LIST:-}" ]; then
+          echo "::error::plugins-list must be empty unless plugins=custom (got plugins='$PLUGINS', plugins-list non-empty)" >&2
+          exit 1
+        fi
+
+        # Fast path: nothing to install.
+        if [ "$PLUGINS" = "none" ]; then
+          echo "plugins=none — skipping install"
+          exit 0
+        fi
+
+        # All non-none paths require exactly one of team or user UUID. Fail
+        # loudly here rather than letting the CLI emit an opaque error.
+        if [ -z "${LOCALLY_TEAM_UUID:-}" ] && [ -z "${LOCALLY_USER_UUID:-}" ]; then
+          echo "::error::exactly one of team-uuid or user-uuid (input or env) is required to install plugins" >&2
+          exit 1
+        fi
+        if [ -n "${LOCALLY_TEAM_UUID:-}" ] && [ -n "${LOCALLY_USER_UUID:-}" ]; then
+          echo "::error::LOCALLY_TEAM_UUID and LOCALLY_USER_UUID are mutually exclusive (set only one)" >&2
+          exit 1
+        fi
+
+        case "$PLUGINS" in
+          recommended)
+            echo "Installing recommended plugins"
+            locally plugin install --recommended
+            ;;
+          all)
+            echo "Installing all plugins"
+            locally plugin install --all
+            ;;
+          custom)
+            # Normalise commas to newlines, then iterate. Use a here-string so
+            # the while loop runs in the current shell (not a subshell) and
+            # errors from `locally plugin install` propagate via `set -e`.
+            # The `|| [ -n "$raw" ]` guard processes the final partial line
+            # when the input has no trailing newline.
+            plugins_normalised="$(printf '%s' "$PLUGINS_LIST" | tr ',' '\n')"
+            while IFS= read -r raw || [ -n "$raw" ]; do
+              entry="$(printf '%s' "$raw" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+              [ -z "$entry" ] && continue
+              echo "Installing plugin: $entry"
+              locally plugin install --name "$entry"
+            done <<< "$plugins_normalised"
+            ;;
+        esac

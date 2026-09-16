@@ -1,0 +1,22 @@
+name: Locally teardown
+description: Stop `locally ci` and upload its log as an artifact on job failure.
+
+inputs:
+  upload-logs-on-failure:
+    description: Whether to upload `ci.log` as a workflow artifact when the job has failed.
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Stop `locally ci`
+      shell: bash
+      run: locally ci --stop || true
+
+    - name: Upload CI log on failure
+      if: failure() && inputs.upload-logs-on-failure == 'true'
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: locally-ci-log
+        path: ${{ env.LOCALLY_WORKING_DIRECTORY }}/ci.log
+        if-no-files-found: ignore
