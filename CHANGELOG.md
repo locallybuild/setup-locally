@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `setup-locally` now configures the runner's resolver so `*.locally` addresses resolve once `locally ci` has started, and validates this by checking that `control-plane.locally` resolves to `127.0.0.1`. Disable with `configure-dns: 'false'`.
 - `teardown` removes that DNS configuration again.
 
+### Fixed
+- Verifying the CLI download no longer fails on Windows runners, where `shasum` isn't available.
+
 ## 1.0.0 (2026-09-16)
 
 ### Added
