@@ -78,6 +78,7 @@ The full list of arguments:
 | `plugins` | no | `recommended` | One of `none`, `recommended`, `all`, `custom` |
 | `plugins-list` | when `plugins=custom` | `''` | Comma- or newline-separated plugin list |
 | `start` | no | `true` | Generate TLS, install plugins, start `locally ci` |
+| `configure-dns` | no | `true` | Route `*.locally` to Locally's DNS once started, and check it resolves |
 | `cache` | no | `true` | Cache the plugin directory between runs |
 | `cache-key-prefix` | no | `''` | Optional cache key prefix |
 | `expected-checksum` | no | `''` | SHA-256 to verify CLI tarball against |
@@ -119,7 +120,9 @@ See [`install-plugins/action.yml`](install-plugins/action.yml) for the full inpu
 
 ## Example: Using `locallybuild/setup-locally/teardown@v1`
 
-Use this subaction as the final step of any job that called `setup-locally` — it stops `locally ci` and, on job failure, uploads `ci.log` as a workflow artifact for debugging.
+Use this subaction as the final step of any job that called `setup-locally` — it stops `locally ci`, removes the `*.locally` DNS configuration added by `configure-dns`, and, on job failure, uploads `ci.log` as a workflow artifact for debugging.
+
+On self-hosted runners this matters: without it, the runner is left routing `*.locally` to Locally's DNS port after Locally has stopped.
 
 ```yaml
 - uses: locallybuild/setup-locally/teardown@v1
