@@ -78,6 +78,7 @@ The full list of arguments:
 | `plugins` | no | `recommended` | One of `none`, `recommended`, `all`, `custom` |
 | `plugins-list` | when `plugins=custom` | `''` | Comma- or newline-separated plugin list |
 | `start` | no | `true` | Generate TLS, install plugins, start `locally ci` |
+| `configure-dns` | no | `true` | Route `*.locally` to Locally's DNS once started, and check it resolves |
 | `cache` | no | `true` | Cache the plugin directory between runs |
 | `cache-key-prefix` | no | `''` | Optional cache key prefix |
 | `expected-checksum` | no | `''` | SHA-256 to verify CLI tarball against |

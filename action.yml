@@ -42,6 +42,12 @@ inputs:
       Set this when you want to anchor trust to a hash you've verified
       out-of-band rather than to whatever the release pipeline emits.
     default: ''
+  configure-dns:
+    description: |
+      Whether to point the runner's resolver at Locally's DNS once `locally ci`
+      is running, so that `*.locally` addresses (e.g. Key Vault data planes)
+      resolve. Only applies when `start` is true.
+    default: 'true'
 
 runs:
   using: composite
@@ -320,4 +326,58 @@ runs:
 
         echo "::error::Locally CI did not become ready within 120s"
         cat "$LOCALLY_WORKING_DIRECTORY/ci.log" >&2 || true
+        exit 1
+
+    # Data planes (e.g. Key Vault) are reached on *.locally, which the runner's
+    # resolver doesn't know about - so route it to Locally's DNS, then check
+    # that it actually took effect rather than trusting the exit code.
+    - name: Configure DNS for `*.locally`
+      if: inputs.start == 'true' && inputs.configure-dns == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        locally_bin="$(command -v locally)"
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          # Windows runners already run elevated.
+          "$locally_bin" configure dns
+        else
+          sudo "$locally_bin" configure dns
+        fi
+
+    - name: Validate DNS for `*.locally`
+      if: inputs.start == 'true' && inputs.configure-dns == 'true'
+      shell: bash
+      run: |
+        set -uo pipefail
+
+        status="$(locally configure dns --status 2>&1)"
+        echo "$status"
+        if ! printf '%s\n' "$status" | grep -q '^dns: configured'; then
+          echo "::error::locally configure dns --status doesn't report DNS as configured"
+          exit 1
+        fi
+
+        # Locally's DNS only answers for names it serves, so check one it
+        # always does. Resolve through the OS resolver (rather than the CLI's
+        # own) since that's what every other tool in the job will use.
+        name="control-plane.locally"
+        resolve() {
+          case "$RUNNER_OS" in
+            Linux)   getent ahostsv4 "$name" | awk '{print $1; exit}' ;;
+            macOS)   dscacheutil -q host -a name "$name" | awk '/^ip_address:/ {print $2; exit}' ;;
+            Windows) powershell -NoProfile -Command "(Resolve-DnsName -Name '$name' -Type A -DnsOnly -ErrorAction SilentlyContinue | Where-Object { \$_.IPAddress } | Select-Object -First 1).IPAddress" | tr -d '\r' ;;
+          esac
+        }
+
+        # The resolver can take a moment to pick up the new configuration.
+        for _ in $(seq 1 10); do
+          addr="$(resolve || true)"
+          if [ "$addr" = "127.0.0.1" ]; then
+            echo "$name resolves to $addr"
+            exit 0
+          fi
+          sleep 1
+        done
+
+        echo "::error::$name resolved to '${addr:-nothing}' (expected 127.0.0.1) - *.locally isn't routed to Locally's DNS"
         exit 1
