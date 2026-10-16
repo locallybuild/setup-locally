@@ -46,7 +46,8 @@ inputs:
     description: |
       Whether to point the runner's resolver at Locally's DNS once `locally ci`
       is running, so that `*.locally` addresses (e.g. Key Vault data planes)
-      resolve. Only applies when `start` is true.
+      resolve. Uses `locally configure dns` on Linux and macOS, and an NRPT
+      rule on Windows. Only applies when `start` is true.
     default: 'true'
 
 runs:
@@ -351,13 +352,26 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        # Recorded before configuring, so teardown also cleans up after a
-        # partial configuration - `--remove` only removes what Locally added.
-        echo "LOCALLY_DNS_CONFIGURED=true" >> "$GITHUB_ENV"
         if [ "$RUNNER_OS" = "Windows" ]; then
-          # Windows runners already run elevated.
-          "$LOCALLY_CLI_PATH" configure dns
+          # `locally configure dns` doesn't support Windows yet, so add the
+          # NRPT rule it recommends (Locally's DNS also listens on port 53
+          # there). Windows runners already run elevated. Only a rule this
+          # step adds is recorded, so teardown never removes one it didn't add.
+          rule="$(powershell -NoProfile -NonInteractive -Command '
+            $ErrorActionPreference = "Stop"
+            $existing = Get-DnsClientNrptRule | Where-Object { $_.Namespace -contains ".locally" -and $_.NameServers -contains "127.0.0.1" }
+            if (-not $existing) {
+              (Add-DnsClientNrptRule -Namespace ".locally" -NameServers "127.0.0.1" -PassThru).Name
+            }
+            Clear-DnsClientCache
+          ' | tr -d '\r')"
+          if [ -n "$rule" ]; then
+            echo "LOCALLY_DNS_NRPT_RULE=$rule" >> "$GITHUB_ENV"
+          fi
         else
+          # Recorded before configuring, so teardown also cleans up after a
+          # partial configuration - `--remove` only removes what Locally added.
+          echo "LOCALLY_DNS_CONFIGURED=true" >> "$GITHUB_ENV"
           sudo -n -- "$LOCALLY_CLI_PATH" configure dns
         fi
 
