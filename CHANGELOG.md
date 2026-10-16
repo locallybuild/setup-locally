@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - Verifying the CLI download no longer fails on Windows runners, where `shasum` isn't available.
+- Generating TLS material no longer fails on Windows runners, where Git Bash rewrote the certificate subject into a path.
 
 ## 1.0.0 (2026-09-16)
 

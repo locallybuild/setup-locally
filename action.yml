@@ -230,6 +230,9 @@ runs:
     - name: Generate TLS material
       if: inputs.start == 'true'
       shell: bash
+      env:
+        # Stop Git Bash on Windows rewriting `-subj "/CN=..."` into a path.
+        MSYS_NO_PATHCONV: '1'
       run: |
         set -euo pipefail
         cd "$LOCALLY_WORKING_DIRECTORY"
