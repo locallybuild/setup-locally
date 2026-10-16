@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - `setup-locally` now configures the runner's resolver so `*.locally` addresses resolve once `locally ci` has started, and validates this by checking that `control-plane.locally` resolves to `127.0.0.1`. Disable with `configure-dns: 'false'`.
+- `teardown` removes that DNS configuration again.
 
 ## 1.0.0 (2026-09-16)
 

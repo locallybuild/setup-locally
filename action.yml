@@ -210,6 +210,13 @@ runs:
           chmod +x locally
         fi
         echo "$cli_dir" >> "$GITHUB_PATH"
+        # The absolute path, for steps that run the CLI elevated - so that
+        # they don't pick up whichever `locally` is first on PATH.
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          echo "LOCALLY_CLI_PATH=$cli_dir/locally.exe" >> "$GITHUB_ENV"
+        else
+          echo "LOCALLY_CLI_PATH=$cli_dir/locally" >> "$GITHUB_ENV"
+        fi
 
     - name: Verify CLI install
       shell: bash
@@ -336,12 +343,14 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        locally_bin="$(command -v locally)"
+        # Recorded before configuring, so teardown also cleans up after a
+        # partial configuration - `--remove` only removes what Locally added.
+        echo "LOCALLY_DNS_CONFIGURED=true" >> "$GITHUB_ENV"
         if [ "$RUNNER_OS" = "Windows" ]; then
           # Windows runners already run elevated.
-          "$locally_bin" configure dns
+          "$LOCALLY_CLI_PATH" configure dns
         else
-          sudo "$locally_bin" configure dns
+          sudo -n -- "$LOCALLY_CLI_PATH" configure dns
         fi
 
     - name: Validate DNS for `*.locally`
