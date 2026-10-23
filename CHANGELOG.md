@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## Unreleased
+## 1.0.2 (2026-10-23)
 
 ### Added
 - `setup-locally` has a new `accept-sql-server-licence` input which, when explicitly set to `'true'`, sets `LOCALLY_ACCEPT_SQL_SERVER_LICENCE` so that `locally ci` can run SQL Server. It defaults to `'false'`, which leaves the variable unset.
