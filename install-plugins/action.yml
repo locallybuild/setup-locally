@@ -9,7 +9,9 @@ description: |
   — typically by running `locallybuild/setup-locally` first. Standalone
   callers must set LOCALLY_WORKING_DIRECTORY, LOCALLY_PLUGIN_DIRECTORY,
   and exactly one of LOCALLY_TEAM_UUID or LOCALLY_USER_UUID (or pass the
-  matching team-uuid / user-uuid input) themselves.
+  matching team-uuid / user-uuid input) themselves, plus
+  LOCALLY_ACCEPT_SQL_SERVER_LICENCE (or the accept-sql-server-licence input)
+  if they're accepting the SQL Server licence.
 
 inputs:
   plugins:
@@ -32,6 +34,13 @@ inputs:
   user-uuid:
     description: "Locally user UUID. Optional — falls back to the LOCALLY_USER_UUID env var when blank. Mutually exclusive with team-uuid."
     default: ''
+  accept-sql-server-licence:
+    description: |
+      Whether to accept the Microsoft SQL Server licence on your behalf, by
+      setting `LOCALLY_ACCEPT_SQL_SERVER_LICENCE`. This must be explicitly set
+      to 'true' - otherwise the LOCALLY_ACCEPT_SQL_SERVER_LICENCE env var (as
+      set by `setup-locally`) is inherited as-is.
+    default: 'false'
 
 runs:
   using: composite
@@ -43,6 +52,7 @@ runs:
         PLUGINS_LIST: ${{ inputs.plugins-list }}
         TEAM_UUID_INPUT: ${{ inputs.team-uuid }}
         USER_UUID_INPUT: ${{ inputs.user-uuid }}
+        ACCEPT_SQL_SERVER_LICENCE_INPUT: ${{ inputs.accept-sql-server-licence }}
       run: |
         set -euo pipefail
 
@@ -53,6 +63,16 @@ runs:
         if [ -n "$USER_UUID_INPUT" ]; then
           export LOCALLY_USER_UUID="$USER_UUID_INPUT"
         fi
+
+        # Only ever set when explicitly accepted - otherwise inherit from env.
+        case "$ACCEPT_SQL_SERVER_LICENCE_INPUT" in
+          true) export LOCALLY_ACCEPT_SQL_SERVER_LICENCE=true ;;
+          false) ;;
+          *)
+            echo "::error::accept-sql-server-licence must be 'true' or 'false' (got '$ACCEPT_SQL_SERVER_LICENCE_INPUT')" >&2
+            exit 1
+            ;;
+        esac
 
         # Validate plugins / plugins-list combination.
         case "$PLUGINS" in
