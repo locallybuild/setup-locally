@@ -79,6 +79,7 @@ The full list of arguments:
 | `plugins-list` | when `plugins=custom` | `''` | Comma- or newline-separated plugin list |
 | `start` | no | `true` | Generate TLS, install plugins, start `locally ci` |
 | `configure-dns` | no | `true` | Route `*.locally` to Locally's DNS once started, and check it resolves |
+| `accept-sql-server-licence` | no | `false` | Accept the Microsoft SQL Server licence by setting `LOCALLY_ACCEPT_SQL_SERVER_LICENCE` - must be explicitly set to `true` |
 | `cache` | no | `true` | Cache the plugin directory between runs |
 | `cache-key-prefix` | no | `''` | Optional cache key prefix |
 | `expected-checksum` | no | `''` | SHA-256 to verify CLI tarball against |
@@ -113,6 +114,7 @@ The full list of arguments:
 | `plugins-list` | when `plugins=custom` | `''` | Comma- or newline-separated plugin list |
 | `team-uuid` | one of¹ | `''` | Locally team UUID (falls back to the `LOCALLY_TEAM_UUID` env var set by `setup-locally`) |
 | `user-uuid` | one of¹ | `''` | Locally user UUID (falls back to the `LOCALLY_USER_UUID` env var set by `setup-locally`) |
+| `accept-sql-server-licence` | no | `false` | Accept the Microsoft SQL Server licence by setting `LOCALLY_ACCEPT_SQL_SERVER_LICENCE` - must be explicitly set to `true` (otherwise the env var set by `setup-locally` is inherited) |
 
 ¹ Exactly one of `team-uuid` or `user-uuid` must be resolvable (via input or inherited env) for any value of `plugins` other than `none`. Setting both fails.
 
