@@ -19,21 +19,14 @@ runs:
       if: env.LOCALLY_DNS_CONFIGURED == 'true'
       shell: bash
       run: |
-        sudo -n -- "$LOCALLY_CLI_PATH" configure dns --remove ||
+        # Windows runners already run elevated (and have no sudo).
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          sudo=()
+        else
+          sudo=(sudo -n --)
+        fi
+        "${sudo[@]}" "$LOCALLY_CLI_PATH" configure dns --remove ||
           echo "::warning::Failed to remove the DNS configuration for *.locally"
-
-    # On Windows, setup adds an NRPT rule itself (`locally configure dns`
-    # doesn't support Windows yet), so remove exactly that rule.
-    - name: Remove NRPT rule for `*.locally`
-      if: env.LOCALLY_DNS_NRPT_RULE != ''
-      shell: pwsh
-      run: |
-        try {
-          Remove-DnsClientNrptRule -Name $env:LOCALLY_DNS_NRPT_RULE -Force -ErrorAction Stop
-          Clear-DnsClientCache
-        } catch {
-          Write-Output "::warning::Failed to remove the NRPT rule for *.locally: $_"
-        }
 
     - name: Upload CI log on failure
       if: failure() && inputs.upload-logs-on-failure == 'true'
