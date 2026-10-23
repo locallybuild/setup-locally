@@ -13,6 +13,21 @@ runs:
       shell: bash
       run: locally ci --stop || true
 
+    # Undo `configure-dns`, so that a self-hosted runner isn't left routing
+    # *.locally to a port nothing is listening on (or something else is).
+    - name: Remove DNS configuration for `*.locally`
+      if: env.LOCALLY_DNS_CONFIGURED == 'true'
+      shell: bash
+      run: |
+        # Windows runners already run elevated (and have no sudo).
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          sudo=()
+        else
+          sudo=(sudo -n --)
+        fi
+        "${sudo[@]}" "$LOCALLY_CLI_PATH" configure dns --remove ||
+          echo "::warning::Failed to remove the DNS configuration for *.locally"
+
     - name: Upload CI log on failure
       if: failure() && inputs.upload-logs-on-failure == 'true'
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

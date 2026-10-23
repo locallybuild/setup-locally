@@ -1,0 +1,55 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: test-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Runs this checkout of the action (rather than a released tag), then checks
+  # that teardown puts the runner back the way it found it.
+  setup:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write # required: Locally signs in using GitHub's OIDC token
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Configures and validates DNS for *.locally as part of starting up.
+      - uses: ./
+        with:
+          team-uuid: ${{ vars.LOCALLY_TEAM_UUID }}
+          plugins: none
+          cache: 'false'
+
+      - name: Check Locally is serving
+        run: curl -fsSk https://127.0.0.1:5674/_locally/ci/endpoints > /dev/null
+
+      - uses: ./teardown
+        if: always()
+
+      - name: Check teardown removed the DNS configuration
+        run: |
+          status="$(locally configure dns --status 2>&1)"
+          echo "$status"
+          if printf '%s\n' "$status" | grep -q '^dns: configured'; then
+            echo "::error::DNS for *.locally is still configured after teardown"
+            exit 1
+          fi
