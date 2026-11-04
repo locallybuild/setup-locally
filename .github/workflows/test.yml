@@ -53,3 +53,51 @@ jobs:
             echo "::error::DNS for *.locally is still configured after teardown"
             exit 1
           fi
+
+  # Fails on purpose, to check that teardown uploads `ci.log` when an earlier
+  # step in the calling job has failed - and that each leg of a matrix gets an
+  # artifact of its own. `continue-on-error` keeps the run itself green.
+  teardown-on-failure:
+    name: teardown on failure (${{ matrix.leg }})
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      matrix:
+        leg: [a, b]
+    env:
+      LOCALLY_WORKING_DIRECTORY: ${{ github.workspace }}/locally
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Write a stand-in ci.log
+        shell: bash
+        run: mkdir -p "$LOCALLY_WORKING_DIRECTORY" && echo "leg ${{ matrix.leg }}" > "$LOCALLY_WORKING_DIRECTORY/ci.log"
+
+      - name: Fail
+        shell: bash
+        run: exit 1
+
+      - uses: ./teardown
+        if: always()
+
+  check-teardown-on-failure:
+    name: check teardown uploaded ci.log
+    needs: teardown-on-failure
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - name: Check an artifact was uploaded for each leg
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          names="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" --jq '.artifacts[].name' | sort)"
+          echo "$names"
+          for want in locally-ci-log-teardown-on-failure-0 locally-ci-log-teardown-on-failure-1; do
+            if ! printf '%s\n' "$names" | grep -qx "$want"; then
+              echo "::error::Expected an artifact named $want"
+              exit 1
+            fi
+          done

@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## Unreleased
+
+### Fixed
+- `teardown` now uploads `ci.log` when the calling job has failed. Previously it checked `failure()`, which within a composite action only reports on the action's own steps, so the log was never uploaded.
+- `teardown` names the artifact after the job (and matrix leg), so that more than one failing job in a run can each upload their log. Previously each used `locally-ci-log`, so only the first would succeed.
+
 ## 1.0.2 (2026-10-23)
 
 ### Added
