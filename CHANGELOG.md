@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## Unreleased
+## 1.0.3 (2026-11-04)
 
 ### Fixed
 - `teardown` now uploads `ci.log` when the calling job has failed. Previously it checked `failure()`, which within a composite action only reports on the action's own steps, so the log was never uploaded.
