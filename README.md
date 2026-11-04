@@ -138,6 +138,9 @@ The full list of arguments:
 | Name | Required | Default | Description |
 |------|----------|---------|-------------|
 | `upload-logs-on-failure` | no | `'true'` | Whether to upload `ci.log` as a workflow artifact when the job has failed |
+| `job-status` | no | `${{ job.status }}` | The status of the calling job, which decides whether `ci.log` is uploaded. There's no need to set this |
+
+The artifact is named `locally-ci-log-<job id>`, with the matrix index appended (`-0`, `-1`, ...) for each leg of a matrix job.
 
 See [`teardown/action.yml`](teardown/action.yml) for the full input reference.
 

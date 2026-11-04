@@ -5,6 +5,12 @@ inputs:
   upload-logs-on-failure:
     description: Whether to upload `ci.log` as a workflow artifact when the job has failed.
     default: 'true'
+  job-status:
+    description: >-
+      The status of the calling job. Composite actions can't see whether the
+      calling job's steps have failed - `failure()` here only reports on this
+      action's own steps - so this defaults to the calling job's `job.status`.
+    default: ${{ job.status }}
 
 runs:
   using: composite
@@ -28,10 +34,14 @@ runs:
         "${sudo[@]}" "$LOCALLY_CLI_PATH" configure dns --remove ||
           echo "::warning::Failed to remove the DNS configuration for *.locally"
 
+    # `failure()` would only report on this action's own steps, so check the
+    # calling job's status instead.
     - name: Upload CI log on failure
-      if: failure() && inputs.upload-logs-on-failure == 'true'
+      if: always() && inputs.upload-logs-on-failure == 'true' && inputs.job-status == 'failure'
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: locally-ci-log
+        # Artifact names must be unique within a run, so a matrix job needs
+        # one per leg.
+        name: locally-ci-log-${{ github.job }}${{ strategy.job-total > 1 && format('-{0}', strategy.job-index) || '' }}
         path: ${{ env.LOCALLY_WORKING_DIRECTORY }}/ci.log
         if-no-files-found: ignore
