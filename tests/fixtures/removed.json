@@ -1,0 +1,351 @@
+{
+  "from": {
+    "name": "aspire",
+    "createdAt": "2026-11-04T10:07:46.282532Z"
+  },
+  "to": {
+    "live": true,
+    "createdAt": "2026-11-04T18:13:21.265566Z"
+  },
+  "resources": [
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-5f701ff0",
+      "type": "Microsoft.Resources/resourceGroups"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-5f701ff0/providers/Microsoft.Cache/redisEnterprise/cache-d6b91ced374f4",
+      "type": "Microsoft.Cache/redisEnterprise"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-5f701ff0/providers/Microsoft.Cache/redisEnterprise/cache-d6b91ced374f4/databases/default",
+      "type": "Microsoft.Cache/redisEnterprise/databases"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-5f701ff0/providers/Microsoft.Cache/redisEnterprise/cache-d6b91ced374f4/databases/default/accessPolicyAssignments/196ba777-8dfb-344b-0d04-c45bec2deabe",
+      "type": "Microsoft.Cache/redisEnterprise/databases/accessPolicyAssignments"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-5f701ff0/providers/Microsoft.Resources/deployments/cache",
+      "type": "Microsoft.Resources/deployments"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-5f701ff0/providers/Microsoft.Resources/deployments/cache-roles",
+      "type": "Microsoft.Resources/deployments"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-5f701ff0/providers/Microsoft.Resources/deployments/storage",
+      "type": "Microsoft.Resources/deployments"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-5f701ff0/providers/Microsoft.Resources/deployments/storage-roles",
+      "type": "Microsoft.Resources/deployments"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-5f701ff0/providers/Microsoft.Storage/storageAccounts/storaged6b91ced374f4",
+      "type": "Microsoft.Storage/storageAccounts"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-5f701ff0/providers/Microsoft.Storage/storageAccounts/storaged6b91ced374f4/blobServices/default",
+      "type": "Microsoft.Storage/storageAccounts/blobServices"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-5f701ff0/providers/Microsoft.Storage/storageAccounts/storaged6b91ced374f4/blobServices/default/containers/entries",
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-5f701ff0/providers/Microsoft.Storage/storageAccounts/storaged6b91ced374f4/providers/Microsoft.Authorization/roleAssignments/3df566dc-6680-e289-a31a-0e01b2a6587f",
+      "type": "Microsoft.Authorization/roleAssignments"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-5f701ff0/providers/Microsoft.Storage/storageAccounts/storaged6b91ced374f4/providers/Microsoft.Authorization/roleAssignments/91374924-60bd-d101-06b9-601ee567ce2e",
+      "type": "Microsoft.Authorization/roleAssignments"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-5f701ff0/providers/Microsoft.Storage/storageAccounts/storaged6b91ced374f4/providers/Microsoft.Authorization/roleAssignments/a9d73627-7fa1-0680-f02f-fb34576f36fb",
+      "type": "Microsoft.Authorization/roleAssignments"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-5f701ff0/providers/Microsoft.Storage/storageAccounts/storaged6b91ced374f4/queueServices/default",
+      "type": "Microsoft.Storage/storageAccounts/queueServices"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-5f701ff0/providers/Microsoft.Storage/storageAccounts/storaged6b91ced374f4/queueServices/default/queues/submissions",
+      "type": "Microsoft.Storage/storageAccounts/queueServices/queues"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-63fe703e",
+      "type": "Microsoft.Resources/resourceGroups"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-63fe703e/providers/Microsoft.Cache/redisEnterprise/cache-e50f901963213",
+      "type": "Microsoft.Cache/redisEnterprise"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-63fe703e/providers/Microsoft.Cache/redisEnterprise/cache-e50f901963213/databases/default",
+      "type": "Microsoft.Cache/redisEnterprise/databases"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-63fe703e/providers/Microsoft.Cache/redisEnterprise/cache-e50f901963213/databases/default/accessPolicyAssignments/36118a06-9290-ba32-d8bb-a98160c1b45d",
+      "type": "Microsoft.Cache/redisEnterprise/databases/accessPolicyAssignments"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-63fe703e/providers/Microsoft.Resources/deployments/cache",
+      "type": "Microsoft.Resources/deployments"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-63fe703e/providers/Microsoft.Resources/deployments/cache-roles",
+      "type": "Microsoft.Resources/deployments"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-63fe703e/providers/Microsoft.Resources/deployments/storage",
+      "type": "Microsoft.Resources/deployments"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-63fe703e/providers/Microsoft.Resources/deployments/storage-roles",
+      "type": "Microsoft.Resources/deployments"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-63fe703e/providers/Microsoft.Storage/storageAccounts/storagee50f901963213",
+      "type": "Microsoft.Storage/storageAccounts"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-63fe703e/providers/Microsoft.Storage/storageAccounts/storagee50f901963213/blobServices/default",
+      "type": "Microsoft.Storage/storageAccounts/blobServices"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-63fe703e/providers/Microsoft.Storage/storageAccounts/storagee50f901963213/blobServices/default/containers/entries",
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-63fe703e/providers/Microsoft.Storage/storageAccounts/storagee50f901963213/providers/Microsoft.Authorization/roleAssignments/90dd1bb9-fe74-3c4d-4088-b695ed4b8f35",
+      "type": "Microsoft.Authorization/roleAssignments"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-63fe703e/providers/Microsoft.Storage/storageAccounts/storagee50f901963213/providers/Microsoft.Authorization/roleAssignments/d3c5bee7-5d8e-8cdd-2a32-c84d697dc094",
+      "type": "Microsoft.Authorization/roleAssignments"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-63fe703e/providers/Microsoft.Storage/storageAccounts/storagee50f901963213/providers/Microsoft.Authorization/roleAssignments/da3218b7-6a53-be13-82ef-9cdf88d1253b",
+      "type": "Microsoft.Authorization/roleAssignments"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-63fe703e/providers/Microsoft.Storage/storageAccounts/storagee50f901963213/queueServices/default",
+      "type": "Microsoft.Storage/storageAccounts/queueServices"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-aspire-apphost-63fe703e/providers/Microsoft.Storage/storageAccounts/storagee50f901963213/queueServices/default/queues/submissions",
+      "type": "Microsoft.Storage/storageAccounts/queueServices/queues"
+    }
+  ],
+  "data": [
+    {
+      "component": "bigbrain",
+      "type": "eventgrid_namespaces",
+      "changes": [
+        {
+          "action": "removed",
+          "key": "resources"
+        }
+      ]
+    },
+    {
+      "component": "bigbrain",
+      "type": "eventgrid_topics",
+      "changes": [
+        {
+          "action": "removed",
+          "key": "resources/00000000-0000-0000-0000-000000000000"
+        }
+      ]
+    },
+    {
+      "component": "bigbrain",
+      "type": "seeded_identities",
+      "changes": [
+        {
+          "action": "changed",
+          "key": "11111111-1111-1111-1111-111111111111/dashboard/3eb8ed3e-5a13-440a-b9ef-e2d4bed8d9bb",
+          "changes": [
+            {
+              "action": "changed",
+              "path": "objectUuid",
+              "before": "37d514f3-dbf1-466c-841a-21ae727ba40c",
+              "after": "deb55c00-7e5a-4509-9bae-740ac52265ab"
+            }
+          ]
+        },
+        {
+          "action": "changed",
+          "key": "11111111-1111-1111-1111-111111111111/template-deployment/1bbf2dca-02c6-4b02-b492-638743504bb0",
+          "changes": [
+            {
+              "action": "changed",
+              "path": "objectUuid",
+              "before": "0e873f69-f289-43fe-95f2-60d2ddd3ce2e",
+              "after": "a8a752e8-885a-4d6a-ae89-524c156ca670"
+            }
+          ]
+        },
+        {
+          "action": "changed",
+          "key": "11111111-1111-1111-1111-111111111111/tenant-default/937c57ad-313b-46cb-ba5b-6180f2b379fc",
+          "changes": [
+            {
+              "action": "changed",
+              "path": "objectUuid",
+              "before": "a0370869-b588-44f4-a15c-0ab0c1bc5780",
+              "after": "52e1a814-5aa1-4f9f-9098-df5d4ce070e7"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "component": "bigbrain",
+      "type": "storage_containers",
+      "changes": [
+        {
+          "action": "removed",
+          "key": "storaged6b91ced374f4/entries"
+        },
+        {
+          "action": "removed",
+          "key": "storagee50f901963213/entries"
+        }
+      ]
+    },
+    {
+      "component": "bigbrain",
+      "type": "storage_queues",
+      "changes": [
+        {
+          "action": "removed",
+          "key": "storaged6b91ced374f4/submissions"
+        },
+        {
+          "action": "removed",
+          "key": "storagee50f901963213/submissions"
+        }
+      ]
+    },
+    {
+      "component": "containers",
+      "type": "container_volumes",
+      "changes": [
+        {
+          "action": "removed",
+          "key": "locally-5a26b9e6-95d4-4fa0-a4b5-1d20bfd3213b/data"
+        },
+        {
+          "action": "removed",
+          "key": "locally-a320f2d2-b776-44a4-8138-adf20718555f/data"
+        }
+      ]
+    },
+    {
+      "component": "storage",
+      "type": "blobs",
+      "changes": [
+        {
+          "action": "removed",
+          "key": "storaged6b91ced374f4/entries/check.txt"
+        },
+        {
+          "action": "removed",
+          "key": "storagee50f901963213/entries/4aecf9f2-0517-44da-a004-36f1a2e5e0f9.json"
+        },
+        {
+          "action": "removed",
+          "key": "storagee50f901963213/entries/6f89d90a-fc6d-4c10-93c0-78d7f1a5fc6c.json"
+        },
+        {
+          "action": "removed",
+          "key": "storagee50f901963213/entries/9bf93f63-5941-4f7e-9202-dda960c61cbe.json"
+        }
+      ]
+    },
+    {
+      "component": "storage",
+      "type": "content_files",
+      "changes": [
+        {
+          "action": "removed",
+          "key": "data/storaged6b91ced374f4"
+        },
+        {
+          "action": "removed",
+          "key": "data/storaged6b91ced374f4/entries"
+        },
+        {
+          "action": "removed",
+          "key": "data/storaged6b91ced374f4/entries/check.txt"
+        },
+        {
+          "action": "removed",
+          "key": "data/storagee50f901963213"
+        },
+        {
+          "action": "removed",
+          "key": "data/storagee50f901963213/entries"
+        },
+        {
+          "action": "removed",
+          "key": "data/storagee50f901963213/entries/4aecf9f2-0517-44da-a004-36f1a2e5e0f9.json"
+        },
+        {
+          "action": "removed",
+          "key": "data/storagee50f901963213/entries/6f89d90a-fc6d-4c10-93c0-78d7f1a5fc6c.json"
+        },
+        {
+          "action": "removed",
+          "key": "data/storagee50f901963213/entries/9bf93f63-5941-4f7e-9202-dda960c61cbe.json"
+        }
+      ]
+    }
+  ],
+  "skipped": [
+    "postie/eventgrid_events",
+    "postie/eventgrid_sequences",
+    "woodchuck/activity_log"
+  ],
+  "summary": {
+    "resourcesAdded": 0,
+    "resourcesChanged": 0,
+    "resourcesRemoved": 32,
+    "dataAdded": 0,
+    "dataChanged": 3,
+    "dataRemoved": 20
+  }
+}

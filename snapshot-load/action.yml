@@ -1,0 +1,144 @@
+name: Locally snapshot load
+description: |
+  Replace everything in a running Locally instance with a snapshot, using
+  `locally snapshot load`. The snapshot is one on the runner (by name, by
+  path, or the one in a folder a workflow artifact was downloaded to) or one
+  shared with your Locally Team.
+
+  Requires Locally to be running - typically via `locallybuild/setup-locally`.
+
+inputs:
+  snapshot:
+    description: |
+      The snapshot to load. What it is depends on `source`:
+        local — a snapshot's name, the path of a `.locallysnap` file, or the
+                path of a folder holding exactly one (such as one a workflow
+                artifact was downloaded to)
+        team  — the name of a snapshot shared with your Locally Team
+    required: true
+  source:
+    description: |
+      Where the snapshot comes from - one of `local` (on the runner, the
+      default) or `team`. A team's snapshot is downloaded, loaded, then
+      removed from the runner (requires the Team plan).
+    default: 'local'
+  team:
+    description: The Locally Team's name or ID, when `source` is `team` (only needed when you're in more than one team).
+    default: ''
+  passphrase:
+    description: The passphrase, when the snapshot is encrypted. Pass it in from a secret.
+    default: ''
+  timeout:
+    description: |
+      Give up if running operations haven't finished within this time (a Go
+      duration, e.g. `5m`). Defaults to waiting until they finish.
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Load snapshot
+      shell: bash
+      env:
+        SNAPSHOT_INPUT: ${{ inputs.snapshot }}
+        SOURCE: ${{ inputs.source }}
+        TEAM: ${{ inputs.team }}
+        PASSPHRASE: ${{ inputs.passphrase }}
+        TIMEOUT: ${{ inputs.timeout }}
+      run: |
+        set -euo pipefail
+        # Trimmed, as a value from a YAML block ends with a newline.
+        snapshot="${SNAPSHOT_INPUT#"${SNAPSHOT_INPUT%%[![:space:]]*}"}"
+        snapshot="${snapshot%"${snapshot##*[![:space:]]}"}"
+        # GitHub doesn't enforce `required` for a composite action.
+        if [ -z "$snapshot" ]; then
+          echo "::error::snapshot is required: the name of a snapshot, or the path of a .locallysnap file or of a folder holding one" >&2
+          exit 1
+        fi
+        case "$SOURCE" in
+          local|team) ;;
+          *) echo "::error::source must be one of: local, team (got '$SOURCE')" >&2; exit 1 ;;
+        esac
+        if [ -n "$TEAM" ] && [ "$SOURCE" != "team" ]; then
+          echo "::error::team only applies when source=team" >&2
+          exit 1
+        fi
+
+        # The CLI only reads a passphrase from its environment or a prompt,
+        # so that it's never on a command line.
+        if [ -n "$PASSPHRASE" ]; then
+          echo "::add-mask::$PASSPHRASE"
+          export LOCALLY_SNAPSHOT_PASSPHRASE="$PASSPHRASE"
+        fi
+
+        load() { # name or path
+          local args=(snapshot load "$1")
+          if [ -n "$TIMEOUT" ]; then
+            args+=(--timeout "$TIMEOUT")
+          fi
+          locally "${args[@]}"
+        }
+
+        # A file's name made safe to write to the log: the runner acts on
+        # workflow commands (::name::) wherever they start a line, and a file
+        # that came out of an artifact can be called anything.
+        printable() {
+          local name="${1//$'\r'/ }"
+          name="${name//$'\n'/ }"
+          printf '%s' "${name//::/: :}"
+        }
+
+        if [ "$SOURCE" = "local" ]; then
+          # It's handed to the CLI as an argument, which would read it as a flag.
+          case "$snapshot" in
+            -*)
+              echo "::error::snapshot can't start with '-' (got '$snapshot'): for a file of that name, give its path, e.g. ./$snapshot" >&2
+              exit 1
+              ;;
+          esac
+          ref="$snapshot"
+          # The one snapshot in a folder, which is what downloading a workflow
+          # artifact leaves.
+          if [ -d "$snapshot" ]; then
+            found=()
+            while IFS= read -r -d '' f; do found+=("$f"); done \
+              < <(find "$snapshot" -type f -name '*.locallysnap' -print0)
+            if [ "${#found[@]}" -eq 0 ]; then
+              echo "::error::there's no .locallysnap file in $snapshot" >&2
+              exit 1
+            fi
+            if [ "${#found[@]}" -gt 1 ]; then
+              names=""
+              for f in "${found[@]}"; do
+                names+="${names:+, }$(printable "$f")"
+              done
+              echo "::error::there are ${#found[@]} .locallysnap files in $snapshot: give the path of the one to load ($names)" >&2
+              exit 1
+            fi
+            ref="${found[0]}"
+            if [ "$RUNNER_OS" = "Windows" ]; then
+              ref="$(cygpath -w "$ref")"
+            fi
+            echo "Loading $(printable "$ref")"
+          fi
+          load "$ref"
+          exit 0
+        fi
+
+        if ! printf '%s' "$snapshot" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$'; then
+          echo "::error::'$snapshot' isn't a valid snapshot name - use letters, digits, '.', '_' and '-', starting with a letter or digit (at most 100 characters)" >&2
+          exit 1
+        fi
+        # Downloaded under a name of its own, so that it can't clash with (or
+        # replace) a snapshot that's already on the runner, then removed again.
+        ref="gh-load-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-$RANDOM"
+        args=(snapshot download "$snapshot" --as "$ref")
+        if [ -n "$TEAM" ]; then
+          args+=(--team "$TEAM")
+        fi
+        locally "${args[@]}"
+        status=0
+        load "$ref" || status=$?
+        locally snapshot delete "$ref" ||
+          echo "::warning::Failed to remove the downloaded snapshot '$ref'"
+        exit "$status"

@@ -1,0 +1,39 @@
+{
+  "from": { "name": "baseline", "createdAt": "2026-11-04T10:07:46.282532Z" },
+  "to": { "name": "after<script>", "createdAt": "2026-11-04T18:13:21Z" },
+  "resources": [
+    {
+      "action": "added",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example",
+      "type": "Microsoft.Resources/resourceGroups"
+    },
+    {
+      "action": "changed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example/providers/Microsoft.Storage/storageAccounts/examplesa",
+      "type": "Microsoft.Storage/storageAccounts",
+      "changes": [
+        { "action": "changed", "path": "properties.minimumTlsVersion", "before": "TLS1_0", "after": "TLS1_2" },
+        { "action": "added", "path": "tags.env", "after": "prod `@everyone` | <b>x</b>" },
+        { "action": "removed", "path": "tags.owner", "before": "@tombuildsstuff" },
+        { "action": "changed", "path": "keys", "record": "account_settings", "sensitive": true }
+      ]
+    }
+  ],
+  "data": [
+    {
+      "component": "storage",
+      "type": "blobs",
+      "changes": [
+        { "action": "added", "key": "examplesa/data/hello.txt" },
+        {
+          "action": "changed",
+          "key": "examplesa/data/config.json",
+          "changes": [ { "action": "changed", "path": "contentLength", "before": 12, "after": 14 } ]
+        }
+      ]
+    }
+  ],
+  "notes": ["storage/blobs was saved at version 1 in \"baseline\" and version 2 in \"after\""],
+  "skipped": ["woodchuck/activity_log"],
+  "summary": { "resourcesAdded": 1, "resourcesChanged": 1, "resourcesRemoved": 0, "dataAdded": 1, "dataChanged": 1, "dataRemoved": 0 }
+}

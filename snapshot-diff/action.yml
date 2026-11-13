@@ -1,0 +1,488 @@
+name: Locally snapshot diff
+description: |
+  Show what changed between two Locally snapshots, or between a snapshot and
+  what's in Locally now, using `locally snapshot diff`. Each side can be a
+  snapshot on the runner, a workflow artifact (from this run, another run, or
+  the latest one on a branch) or a snapshot shared with your Locally Team.
+  The differences are written to the job summary, and can be posted as a pull
+  request comment.
+
+  Requires Locally to be running - typically via `locallybuild/setup-locally` -
+  even when comparing two snapshots.
+
+inputs:
+  from:
+    description: |
+      The earlier side of the comparison. What it is depends on `from-source`:
+        local    — a snapshot's name, or the path to a `.locallysnap` file
+        artifact — the name of a workflow artifact holding one snapshot
+        team     — the name of a snapshot shared with your Locally Team
+    required: true
+  from-source:
+    description: Where `from` comes from - one of `local` (default), `artifact` or `team`.
+    default: 'local'
+  from-run-id:
+    description: With `from-source=artifact`, the ID of the workflow run that uploaded it. Defaults to this run, unless `from-branch` is set.
+    default: ''
+  from-branch:
+    description: With `from-source=artifact`, use the most recent unexpired artifact of that name uploaded on this branch (e.g. `main`).
+    default: ''
+  to:
+    description: |
+      The later side of the comparison, interpreted the same way as `from`
+      (according to `to-source`). Leave empty to compare against what's in
+      Locally now.
+    default: ''
+  to-source:
+    description: Where `to` comes from - one of `local` (default), `artifact` or `team`.
+    default: 'local'
+  to-run-id:
+    description: With `to-source=artifact`, the ID of the workflow run that uploaded it. Defaults to this run, unless `to-branch` is set.
+    default: ''
+  to-branch:
+    description: With `to-source=artifact`, use the most recent unexpired artifact of that name uploaded on this branch.
+    default: ''
+  repository:
+    description: The repository (`owner/name`) to download artifacts from. Defaults to this one.
+    default: ${{ github.repository }}
+  team:
+    description: The Locally Team's name or ID, for a `team` source (only needed when you're in more than one team).
+    default: ''
+  passphrase:
+    description: The passphrase for encrypted snapshots. When both sides are encrypted, they need the same passphrase.
+    default: ''
+  all:
+    description: Also compare timestamps, etags, the activity log, delivered events and issued tokens.
+    default: 'false'
+  timeout:
+    description: When comparing against what's in Locally now, give up if running operations haven't finished within this time (a Go duration, e.g. `5m`).
+    default: ''
+  title:
+    description: The heading for the job summary and pull request comment.
+    default: 'Locally snapshot diff'
+  job-summary:
+    description: Whether to write the differences to the job summary.
+    default: 'true'
+  comment:
+    description: |
+      Whether to post the differences as a comment on the pull request. The
+      comment is updated in place on later runs (see `comment-key`), and is
+      only created when there are differences - an existing one is always
+      updated. Needs `pull-requests: write`.
+    default: 'false'
+  comment-key:
+    description: Identifies the comment to update, so that several diffs can each keep their own comment on one pull request.
+    default: 'default'
+  pull-request-number:
+    description: The pull request to comment on. Defaults to the one that triggered the workflow.
+    default: ${{ github.event.pull_request.number }}
+  artifact:
+    description: |
+      Whether to upload the diff, as JSON, as a workflow artifact when there are
+      differences. The summary and comment link to it, which is where the rest
+      of a diff too long to show in full is.
+    default: 'true'
+  artifact-name:
+    description: The name of that artifact. Defaults to `locally-snapshot-diff-<comment-key>-<a unique suffix>`.
+    default: ''
+  artifact-retention-days:
+    description: How many days to keep that artifact for. Defaults to the repository's setting.
+    default: ''
+  fail-on-changes:
+    description: Whether to fail the step when there are differences (after writing the summary and comment).
+    default: 'false'
+  github-token:
+    description: 'The token used to find and download artifacts and to comment. Needs `actions: read` for artifacts, and `pull-requests: write` to comment.'
+    default: ${{ github.token }}
+
+outputs:
+  has-changes:
+    description: '`true` when there are differences, `false` otherwise.'
+    value: ${{ steps.diff.outputs.has-changes }}
+  resources-added:
+    value: ${{ steps.diff.outputs.resources-added }}
+    description: The number of resources only in `to`.
+  resources-changed:
+    value: ${{ steps.diff.outputs.resources-changed }}
+    description: The number of resources that differ.
+  resources-removed:
+    value: ${{ steps.diff.outputs.resources-removed }}
+    description: The number of resources only in `from`.
+  data-added:
+    value: ${{ steps.diff.outputs.data-added }}
+    description: The number of data records (blobs, queues, directory users, ...) only in `to`.
+  data-changed:
+    value: ${{ steps.diff.outputs.data-changed }}
+    description: The number of data records that differ.
+  data-removed:
+    value: ${{ steps.diff.outputs.data-removed }}
+    description: The number of data records only in `from`.
+  json-path:
+    description: The path of the diff, as `locally snapshot diff --json` printed it.
+    value: ${{ steps.diff.outputs.json-path }}
+  markdown-path:
+    description: The path of the diff rendered as Markdown, as written to the job summary.
+    value: ${{ steps.render.outputs.markdown-path }}
+  artifact-url:
+    description: The URL of the artifact holding the diff as JSON, when one was uploaded.
+    value: ${{ steps.artifact.outputs.artifact-url }}
+  comment-url:
+    description: The URL of the pull request comment, when one was posted or updated.
+    value: ${{ steps.comment.outputs.url }}
+
+runs:
+  using: composite
+  steps:
+    - name: Validate inputs
+      id: prepare
+      shell: bash
+      env:
+        FROM: ${{ inputs.from }}
+        FROM_SOURCE: ${{ inputs.from-source }}
+        FROM_RUN_ID: ${{ inputs.from-run-id }}
+        FROM_BRANCH: ${{ inputs.from-branch }}
+        TO: ${{ inputs.to }}
+        TO_SOURCE: ${{ inputs.to-source }}
+        TO_RUN_ID: ${{ inputs.to-run-id }}
+        TO_BRANCH: ${{ inputs.to-branch }}
+        ALL: ${{ inputs.all }}
+        ARTIFACT: ${{ inputs.artifact }}
+        ARTIFACT_NAME: ${{ inputs.artifact-name }}
+        JOB_SUMMARY: ${{ inputs.job-summary }}
+        COMMENT: ${{ inputs.comment }}
+        COMMENT_KEY: ${{ inputs.comment-key }}
+        FAIL_ON_CHANGES: ${{ inputs.fail-on-changes }}
+      run: |
+        set -euo pipefail
+        if ! command -v jq > /dev/null 2>&1; then
+          echo "::error::jq is needed, but isn't installed on this runner" >&2
+          exit 1
+        fi
+        for pair in "all=$ALL" "artifact=$ARTIFACT" "job-summary=$JOB_SUMMARY" "comment=$COMMENT" "fail-on-changes=$FAIL_ON_CHANGES"; do
+          case "${pair#*=}" in
+            true|false) ;;
+            *) echo "::error::${pair%%=*} must be 'true' or 'false' (got '${pair#*=}')" >&2; exit 1 ;;
+          esac
+        done
+        if [ -z "$FROM" ]; then
+          echo "::error::from is required" >&2
+          exit 1
+        fi
+        check_side() { # side, value, source, run-id, branch
+          case "$3" in
+            local|artifact|team) ;;
+            *) echo "::error::$1-source must be one of: local, artifact, team (got '$3')" >&2; exit 1 ;;
+          esac
+          if [ "$3" != "artifact" ] && { [ -n "$4" ] || [ -n "$5" ]; }; then
+            echo "::error::$1-run-id and $1-branch only apply when $1-source=artifact" >&2
+            exit 1
+          fi
+          if [ -n "$4" ] && [ -n "$5" ]; then
+            echo "::error::$1-run-id and $1-branch are mutually exclusive (set only one)" >&2
+            exit 1
+          fi
+        }
+        check_side from "$FROM" "$FROM_SOURCE" "$FROM_RUN_ID" "$FROM_BRANCH"
+        if [ -n "$TO" ]; then
+          check_side to "$TO" "$TO_SOURCE" "$TO_RUN_ID" "$TO_BRANCH"
+        elif [ "$TO_SOURCE" != "local" ] || [ -n "$TO_RUN_ID" ] || [ -n "$TO_BRANCH" ]; then
+          echo "::error::to-source, to-run-id and to-branch need 'to' to be set (leave 'to' empty to compare against what's in Locally now)" >&2
+          exit 1
+        fi
+        if ! printf '%s' "$COMMENT_KEY" | grep -Eq '^[A-Za-z0-9._-]+$'; then
+          echo "::error::comment-key may only contain letters, digits, '.', '_' and '-' (got '$COMMENT_KEY')" >&2
+          exit 1
+        fi
+
+        # Unique per step, so that a job can diff more than once.
+        work="$RUNNER_TEMP/locally-snapshot-diff-$(date +%s)-$RANDOM"
+        mkdir -p "$work/from" "$work/to"
+        suffix="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-$RANDOM"
+        {
+          echo "work=$work"
+          echo "suffix=$suffix"
+          echo "artifact-name=${ARTIFACT_NAME:-locally-snapshot-diff-$COMMENT_KEY-$suffix}"
+        } >> "$GITHUB_OUTPUT"
+
+    # A workflow artifact from another run needs its run ID, which for a
+    # branch is that of the most recent run that uploaded one by this name.
+    # Runs for pull requests from forks report the fork's branch name, so
+    # only runs of the repository's own branches are trusted - otherwise a
+    # fork could push a `main` branch and have its artifact picked up.
+    - name: Find artifact runs
+      id: runs
+      if: inputs.from-source == 'artifact' || inputs.to-source == 'artifact'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPOSITORY: ${{ inputs.repository }}
+        FROM: ${{ inputs.from }}
+        FROM_SOURCE: ${{ inputs.from-source }}
+        FROM_RUN_ID: ${{ inputs.from-run-id }}
+        FROM_BRANCH: ${{ inputs.from-branch }}
+        TO: ${{ inputs.to }}
+        TO_SOURCE: ${{ inputs.to-source }}
+        TO_RUN_ID: ${{ inputs.to-run-id }}
+        TO_BRANCH: ${{ inputs.to-branch }}
+      run: |
+        set -euo pipefail
+        resolve() { # side, artifact name, run-id, branch
+          local run_id="$3"
+          if [ -z "$run_id" ] && [ -n "$4" ]; then
+            run_id="$(gh api --method GET "repos/$REPOSITORY/actions/artifacts" \
+                -f name="$2" -F per_page=100 --paginate \
+              | jq -r --arg branch "$4" '.artifacts[]
+                  | select((.expired | not)
+                      and .workflow_run.head_branch == $branch
+                      and .workflow_run.head_repository_id == .workflow_run.repository_id)
+                  | "\(.created_at) \(.workflow_run.id)"' \
+              | sort | tail -n 1 | awk '{print $2}')"
+            if [ -z "$run_id" ]; then
+              echo "::error::no unexpired artifact named '$2' was found on the '$4' branch of $REPOSITORY (artifacts from forks are ignored)" >&2
+              exit 1
+            fi
+            echo "Using artifact '$2' from run $run_id on '$4'"
+          fi
+          echo "$1=${run_id:-$GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
+        }
+        if [ "$FROM_SOURCE" = "artifact" ]; then
+          resolve from "$FROM" "$FROM_RUN_ID" "$FROM_BRANCH"
+        fi
+        if [ -n "$TO" ] && [ "$TO_SOURCE" = "artifact" ]; then
+          resolve to "$TO" "$TO_RUN_ID" "$TO_BRANCH"
+        fi
+
+    - name: Download `from` artifact
+      if: inputs.from-source == 'artifact'
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: ${{ inputs.from }}
+        path: ${{ steps.prepare.outputs.work }}/from
+        repository: ${{ inputs.repository }}
+        run-id: ${{ steps.runs.outputs.from }}
+        github-token: ${{ inputs.github-token }}
+
+    - name: Download `to` artifact
+      if: inputs.to != '' && inputs.to-source == 'artifact'
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: ${{ inputs.to }}
+        path: ${{ steps.prepare.outputs.work }}/to
+        repository: ${{ inputs.repository }}
+        run-id: ${{ steps.runs.outputs.to }}
+        github-token: ${{ inputs.github-token }}
+
+    - name: Resolve snapshots
+      id: sides
+      shell: bash
+      env:
+        WORK: ${{ steps.prepare.outputs.work }}
+        SUFFIX: ${{ steps.prepare.outputs.suffix }}
+        TEAM: ${{ inputs.team }}
+        FROM: ${{ inputs.from }}
+        FROM_SOURCE: ${{ inputs.from-source }}
+        TO: ${{ inputs.to }}
+        TO_SOURCE: ${{ inputs.to-source }}
+      run: |
+        set -euo pipefail
+        downloaded=()
+        resolve() { # side, value, source
+          local ref
+          case "$3" in
+            local)
+              ref="$2"
+              ;;
+            artifact)
+              local found=()
+              while IFS= read -r -d '' f; do found+=("$f"); done \
+                < <(find "$WORK/$1" -type f -name '*.locallysnap' -print0)
+              if [ "${#found[@]}" -ne 1 ]; then
+                echo "::error::the '$2' artifact ($1) should hold exactly one .locallysnap file, but holds ${#found[@]}" >&2
+                exit 1
+              fi
+              ref="${found[0]}"
+              if [ "$RUNNER_OS" = "Windows" ]; then
+                ref="$(cygpath -w "$ref")"
+              fi
+              ;;
+            team)
+              # Downloaded under a name of its own, so that it can't clash
+              # with (or replace) a snapshot that's already on the runner.
+              ref="gh-$1-$SUFFIX"
+              args=(snapshot download "$2" --as "$ref")
+              if [ -n "$TEAM" ]; then
+                args+=(--team "$TEAM")
+              fi
+              locally "${args[@]}"
+              downloaded+=("$ref")
+              ;;
+          esac
+          echo "$1=$ref" >> "$GITHUB_OUTPUT"
+        }
+        resolve from "$FROM" "$FROM_SOURCE"
+        if [ -n "$TO" ]; then
+          resolve to "$TO" "$TO_SOURCE"
+        fi
+        echo "downloaded=${downloaded[*]:-}" >> "$GITHUB_OUTPUT"
+
+    - name: Diff snapshots
+      id: diff
+      shell: bash
+      env:
+        WORK: ${{ steps.prepare.outputs.work }}
+        FROM: ${{ steps.sides.outputs.from }}
+        TO: ${{ steps.sides.outputs.to }}
+        ALL: ${{ inputs.all }}
+        TIMEOUT: ${{ inputs.timeout }}
+        PASSPHRASE: ${{ inputs.passphrase }}
+      run: |
+        set -euo pipefail
+        args=(snapshot diff "$FROM")
+        if [ -n "$TO" ]; then
+          args+=("$TO")
+        fi
+        args+=(--json)
+        if [ "$ALL" = "true" ]; then
+          args+=(--all)
+        fi
+        if [ -n "$TIMEOUT" ]; then
+          args+=(--timeout "$TIMEOUT")
+        fi
+        if [ -n "$PASSPHRASE" ]; then
+          echo "::add-mask::$PASSPHRASE"
+          export LOCALLY_SNAPSHOT_PASSPHRASE="$PASSPHRASE"
+        fi
+
+        json="$WORK/diff.json"
+        # stdout is the diff and nothing else; progress goes to stderr.
+        locally "${args[@]}" > "$json"
+        if ! jq -e '.summary' "$json" > /dev/null; then
+          echo "::error::locally snapshot diff didn't print a diff:" >&2
+          cat "$json" >&2
+          exit 1
+        fi
+
+        has_changes="$(jq -r 'if ((.resources // []) | length) + ((.data // []) | length) > 0 then "true" else "false" end' "$json")"
+        {
+          echo "has-changes=$has_changes"
+          jq -r '.summary | "resources-added=\(.resourcesAdded)\nresources-changed=\(.resourcesChanged)\nresources-removed=\(.resourcesRemoved)\ndata-added=\(.dataAdded)\ndata-changed=\(.dataChanged)\ndata-removed=\(.dataRemoved)"' "$json"
+          echo "json-path=$json"
+        } >> "$GITHUB_OUTPUT"
+
+        jq -r '.summary | "Resources: \(.resourcesAdded) added, \(.resourcesChanged) changed, \(.resourcesRemoved) removed. Data: \(.dataAdded) added, \(.dataChanged) changed, \(.dataRemoved) removed."' "$json"
+
+    - name: Upload the diff
+      id: artifact
+      if: inputs.artifact == 'true' && steps.diff.outputs.has-changes == 'true'
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ${{ steps.prepare.outputs.artifact-name }}
+        path: ${{ steps.diff.outputs.json-path }}
+        if-no-files-found: error
+        retention-days: ${{ inputs.artifact-retention-days }}
+
+    # Rendered after the upload, so that it can link to it. The job summary and
+    # the comment differ only in that the comment links back to the run.
+    - name: Render the diff
+      id: render
+      shell: bash
+      env:
+        WORK: ${{ steps.prepare.outputs.work }}
+        JSON: ${{ steps.diff.outputs.json-path }}
+        TITLE: ${{ inputs.title }}
+        COMMENT_KEY: ${{ inputs.comment-key }}
+        ARTIFACT_URL: ${{ steps.artifact.outputs.artifact-url }}
+        RENDERER: ${{ github.action_path }}/../scripts/render-diff.jq
+      run: |
+        set -euo pipefail
+        run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT"
+        render() { # detailed, run URL
+          jq -r -f "$RENDERER" \
+            --arg title "$TITLE" \
+            --arg marker "<!-- locally-snapshot-diff:$COMMENT_KEY -->" \
+            --argjson detailed "$1" \
+            --argjson open_limit 25 \
+            --arg run_url "$2" \
+            --arg artifact_url "$ARTIFACT_URL" \
+            "$JSON"
+        }
+        render true "" > "$WORK/summary.md"
+        render false "" > "$WORK/summary-short.md"
+        render true "$run_url" > "$WORK/comment.md"
+        render false "$run_url" > "$WORK/comment-short.md"
+        echo "markdown-path=$WORK/summary.md" >> "$GITHUB_OUTPUT"
+
+    - name: Write job summary
+      if: inputs.job-summary == 'true'
+      shell: bash
+      env:
+        WORK: ${{ steps.prepare.outputs.work }}
+      run: |
+        set -euo pipefail
+        # Each step's summary is limited to 1 MiB.
+        if [ "$(wc -c < "$WORK/summary.md")" -lt 1000000 ]; then
+          cat "$WORK/summary.md" >> "$GITHUB_STEP_SUMMARY"
+        else
+          cat "$WORK/summary-short.md" >> "$GITHUB_STEP_SUMMARY"
+          echo "::warning::The diff is too large to show in full in the job summary, which links to the rest of it"
+        fi
+
+    - name: Comment on pull request
+      id: comment
+      if: inputs.comment == 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        WORK: ${{ steps.prepare.outputs.work }}
+        HAS_CHANGES: ${{ steps.diff.outputs.has-changes }}
+        PR_NUMBER: ${{ inputs.pull-request-number }}
+        COMMENT_KEY: ${{ inputs.comment-key }}
+      run: |
+        set -euo pipefail
+        if [ -z "$PR_NUMBER" ]; then
+          echo "::warning::comment is enabled, but there's no pull request to comment on - set pull-request-number when the workflow isn't triggered by a pull request"
+          exit 0
+        fi
+        repo="$GITHUB_REPOSITORY"
+        marker="<!-- locally-snapshot-diff:$COMMENT_KEY -->"
+
+        # Comments are limited to 65,536 characters.
+        body_file="$WORK/comment.md"
+        if [ "$(wc -m < "$body_file")" -ge 65000 ]; then
+          body_file="$WORK/comment-short.md"
+        fi
+
+        existing="$(gh api --paginate "repos/$repo/issues/$PR_NUMBER/comments" \
+          | jq -r --arg marker "$marker" '.[] | select(.body | startswith($marker)) | .id' | sed -n '1p')"
+
+        if [ -n "$existing" ]; then
+          url="$(jq -Rs '{body: .}' "$body_file" \
+            | gh api --method PATCH "repos/$repo/issues/comments/$existing" --input - --jq '.html_url')"
+          echo "Updated $url"
+        elif [ "$HAS_CHANGES" = "true" ]; then
+          url="$(jq -Rs '{body: .}' "$body_file" \
+            | gh api --method POST "repos/$repo/issues/$PR_NUMBER/comments" --input - --jq '.html_url')"
+          echo "Commented $url"
+        else
+          echo "No differences, and no earlier comment to update - not commenting"
+          exit 0
+        fi
+        echo "url=$url" >> "$GITHUB_OUTPUT"
+
+    - name: Remove downloaded team snapshots
+      if: always() && steps.sides.outputs.downloaded != ''
+      shell: bash
+      env:
+        DOWNLOADED: ${{ steps.sides.outputs.downloaded }}
+      run: |
+        for name in $DOWNLOADED; do
+          locally snapshot delete "$name" ||
+            echo "::warning::Failed to remove the downloaded snapshot '$name'"
+        done
+
+    - name: Fail on changes
+      if: inputs.fail-on-changes == 'true' && steps.diff.outputs.has-changes == 'true'
+      shell: bash
+      run: |
+        echo "::error::The snapshots differ"
+        exit 1
