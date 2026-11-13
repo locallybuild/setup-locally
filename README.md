@@ -17,7 +17,7 @@ This repository contains several GitHub Actions for [Locally Build](https://loca
 * `locallybuild/setup-locally@v1` - installs and configures Locally.
 * `locallybuild/setup-locally/install-plugins@v1` - allows for installing Locally Plugins.
 * `locallybuild/setup-locally/teardown@v1` - provides a means of stopping Locally once it's been launched in CI mode.
-* `locallybuild/setup-locally/snapshot-save@v1` - takes a [Locally Snapshot](https://locally.build) of everything in Locally, and optionally uploads it as a workflow artifact and/or shares it with your Locally Team.
+* `locallybuild/setup-locally/snapshot-save@v1` - takes a [Locally Snapshot](https://locally.build/docs/features/locally-snapshots) of everything in Locally, and optionally uploads it as a workflow artifact and/or shares it with your Locally Team.
 * `locallybuild/setup-locally/snapshot-load@v1` - replaces everything in Locally with a snapshot.
 * `locallybuild/setup-locally/snapshot-diff@v1` - shows what changed between two snapshots, or between a snapshot and what's in Locally now.
 
@@ -149,7 +149,11 @@ See [`teardown/action.yml`](teardown/action.yml) for the full input reference.
 
 ## Snapshots
 
-A [Locally Snapshot](https://locally.build) is everything in Locally - its resources and their data - in one file, which can be loaded again later or handed to someone else. There are three subactions for working with them, each of which requires `setup-locally` to have run earlier in the job, and reuses its sign-in. Snapshots need the Standard plan or above, and sharing them with a team needs the Team plan or above.
+[Locally Snapshots](https://locally.build/docs/features/locally-snapshots) allow you to capture the resources (and data) within Locally as a single file, which can be restored later or shared with your Team.
+
+The three subactions below are used to save, load and diff Snapshots - each of these needs to run after `setup-locally` in the same job (since they reuse its credentials).
+
+Snapshots are available on the Standard plan and above, whilst sharing a Snapshot with your Team requires the Team plan or above.
 
 > [!WARNING]
 > Snapshots contain the credentials of your resources (Key Vault values, keys, passwords). Anyone who can download a workflow artifact can read an unencrypted snapshot, so set `passphrase` (from a secret) before uploading or sharing one.
