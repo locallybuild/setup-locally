@@ -1,0 +1,191 @@
+name: Locally snapshot save
+description: |
+  Take a snapshot of everything in a running Locally instance with
+  `locally snapshot save`, and optionally upload it as a workflow artifact
+  and/or share it with your Locally Team.
+
+  Requires Locally to be running - typically via `locallybuild/setup-locally`.
+
+inputs:
+  name:
+    description: |
+      The name to save the snapshot under: letters, digits, '.', '_' and '-',
+      starting with a letter or digit (at most 100 characters).
+    required: true
+  description:
+    description: What this snapshot holds and why it was taken (one line, at most 500 characters).
+    default: ''
+  passphrase:
+    description: |
+      Encrypt the snapshot with this passphrase. Snapshots contain the
+      credentials of your resources (Key Vault values, keys, passwords), so
+      set this (from a secret) if the snapshot's going to be shared.
+    default: ''
+  timeout:
+    description: |
+      Give up if running operations haven't finished within this time (a Go
+      duration, e.g. `5m`). Defaults to waiting until they finish.
+    default: ''
+  upload:
+    description: |
+      Where to upload the snapshot once it's saved. Comma- or
+      newline-separated, any of:
+        none     — keep it on the runner only (default)
+        artifact — upload it as a workflow artifact
+        team     — share it with your Locally Team (requires the Team plan)
+    default: 'none'
+  artifact-name:
+    description: The workflow artifact's name when `upload` includes `artifact`. Defaults to `locally-snapshot-<name>`.
+    default: ''
+  artifact-retention-days:
+    description: How many days to keep the workflow artifact for. Defaults to the repository's setting.
+    default: ''
+  artifact-overwrite:
+    description: Whether to replace an artifact of the same name uploaded earlier in this run.
+    default: 'false'
+  team:
+    description: The Locally Team's name or ID to share with, when `upload` includes `team` (only needed when you're in more than one team).
+    default: ''
+
+outputs:
+  name:
+    description: The name the snapshot was saved under.
+    value: ${{ steps.save.outputs.name }}
+  path:
+    description: The path of the snapshot file on the runner.
+    value: ${{ steps.save.outputs.path }}
+  artifact-name:
+    description: The name of the workflow artifact, when one was uploaded.
+    value: ${{ steps.upload.outputs.artifact-name }}
+  artifact-id:
+    description: The ID of the workflow artifact, when one was uploaded.
+    value: ${{ steps.artifact.outputs.artifact-id }}
+  artifact-url:
+    description: The URL of the workflow artifact, when one was uploaded.
+    value: ${{ steps.artifact.outputs.artifact-url }}
+
+runs:
+  using: composite
+  steps:
+    - name: Validate inputs
+      id: upload
+      shell: bash
+      env:
+        NAME_INPUT: ${{ inputs.name }}
+        UPLOAD: ${{ inputs.upload }}
+        ARTIFACT_NAME: ${{ inputs.artifact-name }}
+        ARTIFACT_OVERWRITE: ${{ inputs.artifact-overwrite }}
+        TEAM: ${{ inputs.team }}
+      run: |
+        set -euo pipefail
+        # GitHub doesn't enforce `required` for a composite action.
+        name="$NAME_INPUT"
+        if [ -z "${name//[[:space:]]/}" ]; then
+          echo "::error::name is required: the name to save the snapshot under" >&2
+          exit 1
+        fi
+        if ! printf '%s' "$name" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$'; then
+          echo "::error::'$name' isn't a valid snapshot name - use letters, digits, '.', '_' and '-', starting with a letter or digit (at most 100 characters)" >&2
+          exit 1
+        fi
+        case "$ARTIFACT_OVERWRITE" in
+          true|false) ;;
+          *) echo "::error::artifact-overwrite must be 'true' or 'false' (got '$ARTIFACT_OVERWRITE')" >&2; exit 1 ;;
+        esac
+
+        artifact=false
+        team=false
+        while IFS= read -r raw || [ -n "$raw" ]; do
+          entry="$(printf '%s' "$raw" | tr -d '[:space:]')"
+          case "$entry" in
+            '') ;;
+            none) ;;
+            artifact) artifact=true ;;
+            team) team=true ;;
+            *) echo "::error::upload must be any of: none, artifact, team (got '$entry')" >&2; exit 1 ;;
+          esac
+        done <<< "$(printf '%s' "$UPLOAD" | tr ',' '\n')"
+
+        if [ -n "$TEAM" ] && [ "$team" != "true" ]; then
+          echo "::error::team only applies when upload includes team" >&2
+          exit 1
+        fi
+
+        {
+          echo "name=$name"
+          echo "artifact=$artifact"
+          echo "team=$team"
+          if [ "$artifact" = "true" ]; then
+            echo "artifact-name=${ARTIFACT_NAME:-locally-snapshot-$name}"
+          fi
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Save snapshot
+      id: save
+      shell: bash
+      env:
+        NAME: ${{ steps.upload.outputs.name }}
+        DESCRIPTION: ${{ inputs.description }}
+        PASSPHRASE: ${{ inputs.passphrase }}
+        TIMEOUT: ${{ inputs.timeout }}
+      run: |
+        set -euo pipefail
+        args=(snapshot save --name "$NAME")
+        if [ -n "$DESCRIPTION" ]; then
+          args+=(--description "$DESCRIPTION")
+        fi
+        if [ -n "$TIMEOUT" ]; then
+          args+=(--timeout "$TIMEOUT")
+        fi
+        if [ -n "$PASSPHRASE" ]; then
+          echo "::add-mask::$PASSPHRASE"
+          export LOCALLY_SNAPSHOT_PASSPHRASE="$PASSPHRASE"
+          args+=(--passphrase)
+        fi
+        locally "${args[@]}"
+
+        # Where `locally snapshot save` writes to: the snapshots folder in
+        # Locally's config directory.
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          path="$(cygpath -u "$LOCALAPPDATA")/locally/snapshots/$NAME.locallysnap"
+        else
+          path="$HOME/.config/locally/snapshots/$NAME.locallysnap"
+        fi
+        if [ ! -f "$path" ]; then
+          echo "::error::the snapshot was saved, but isn't at $path" >&2
+          exit 1
+        fi
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          path="$(cygpath -w "$path")"
+        fi
+        {
+          echo "name=$NAME"
+          echo "path=$path"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Upload snapshot as an artifact
+      id: artifact
+      if: steps.upload.outputs.artifact == 'true'
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ${{ steps.upload.outputs.artifact-name }}
+        path: ${{ steps.save.outputs.path }}
+        if-no-files-found: error
+        retention-days: ${{ inputs.artifact-retention-days }}
+        overwrite: ${{ inputs.artifact-overwrite }}
+        # Snapshots are already compressed.
+        compression-level: 0
+
+    - name: Share snapshot with your Locally Team
+      if: steps.upload.outputs.team == 'true'
+      shell: bash
+      env:
+        NAME: ${{ steps.save.outputs.name }}
+        TEAM: ${{ inputs.team }}
+      run: |
+        set -euo pipefail
+        args=(snapshot share "$NAME")
+        if [ -n "$TEAM" ]; then
+          args+=(--team "$TEAM")
+        fi
+        locally "${args[@]}"

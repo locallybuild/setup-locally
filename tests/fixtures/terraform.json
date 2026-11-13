@@ -1,0 +1,65 @@
+{
+  "from": {
+    "name": "before",
+    "createdAt": "2026-11-04T20:11:14.123Z"
+  },
+  "to": {
+    "live": true,
+    "createdAt": "2026-11-04T20:11:52.456Z"
+  },
+  "resources": [
+    {
+      "action": "removed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/snapdiff-rg/providers/Microsoft.Storage/storageAccounts/snapdiffsa/blobServices/default/containers/alpha",
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers"
+    },
+    {
+      "action": "added",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/snapdiff-rg/providers/Microsoft.Storage/storageAccounts/snapdiffsa/blobServices/default/containers/beta",
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers"
+    },
+    {
+      "action": "changed",
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/snapdiff-rg/providers/Microsoft.Storage/storageAccounts/snapdiffsa",
+      "type": "Microsoft.Storage/storageAccounts",
+      "changes": [
+        {
+          "action": "changed",
+          "record": "generic_resources",
+          "path": "tags.environment",
+          "before": "one",
+          "after": "two"
+        }
+      ]
+    }
+  ],
+  "data": [
+    {
+      "component": "bigbrain",
+      "type": "storage_containers",
+      "changes": [
+        {
+          "action": "removed",
+          "key": "snapdiffsa/alpha"
+        },
+        {
+          "action": "added",
+          "key": "snapdiffsa/beta"
+        }
+      ]
+    }
+  ],
+  "skipped": [
+    "postie/eventgrid_events",
+    "postie/eventgrid_sequences",
+    "woodchuck/activity_log"
+  ],
+  "summary": {
+    "resourcesAdded": 1,
+    "resourcesChanged": 1,
+    "resourcesRemoved": 1,
+    "dataAdded": 1,
+    "dataChanged": 0,
+    "dataRemoved": 1
+  }
+}

@@ -117,3 +117,256 @@ jobs:
             echo "::error::Expected no artifact for a job which succeeded"
             exit 1
           fi
+
+  lint:
+    name: Lint and render
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The snapshot actions' scripts take everything from `env:`, never
+      # `${{ }}`, so they can be checked as plain bash.
+      - name: Shellcheck the snapshot actions' scripts
+        run: |
+          set -euo pipefail
+          dir="$(mktemp -d)"
+          for action in snapshot-save/action.yml snapshot-load/action.yml snapshot-diff/action.yml; do
+            count="$(yq '.runs.steps | length' "$action")"
+            for i in $(seq 0 $((count - 1))); do
+              script="$(yq ".runs.steps[$i].run // \"\"" "$action")"
+              [ -n "$script" ] || continue
+              # Split up, so that GitHub doesn't read it as an expression.
+              if printf '%s' "$script" | grep -qF '$''{{'; then
+                echo "::error file=$action::step $i interpolates an expression into its script - pass it through env instead"
+                exit 1
+              fi
+              out="$dir/$(dirname "$action")-$i.sh"
+              printf '#!/usr/bin/env bash\n%s\n' "$script" > "$out"
+            done
+          done
+          shellcheck -s bash "$dir"/*.sh
+
+      - name: Check the Markdown rendering of a snapshot diff
+        run: tests/render.sh
+
+  # Runs this checkout of the snapshot actions against a real Locally,
+  # applying tests/terraform twice with different variables so that there's a
+  # known set of changes to find - and to undo, by loading a snapshot.
+  # Snapshots need the Standard plan or above.
+  snapshots:
+    name: snapshots (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write # required: Locally signs in using GitHub's OIDC token
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    env:
+      TF_IN_AUTOMATION: 'true'
+      TF_INPUT: 'false'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_wrapper: false
+
+      - uses: ./
+        with:
+          team-uuid: ${{ vars.LOCALLY_TEAM_UUID }}
+          plugins: custom
+          plugins-list: Microsoft.Storage
+          cache: 'false'
+
+      # Terraform's providers verify TLS against the system's trust store,
+      # which on Windows doesn't read setup-locally's CA from the environment.
+      - name: Trust Locally's CA
+        if: runner.os == 'Windows'
+        run: certutil -addstore -f Root "$(cygpath -w "$LOCALLY_TLS_CA_FILE_PATH")"
+
+      - name: Apply the first configuration
+        working-directory: tests/terraform
+        run: |
+          locally run terraform init -lockfile=readonly
+          locally run terraform apply -auto-approve -var environment=one -var 'containers=["alpha"]'
+
+      - id: before
+        uses: ./snapshot-save
+        with:
+          name: before
+          description: Taken by the setup-locally tests
+          upload: artifact
+          artifact-name: locally-snapshot-before-${{ matrix.os }}
+
+      - id: again
+        uses: ./snapshot-save
+        with:
+          name: again
+
+      - name: Check the snapshot was saved where the outputs say
+        env:
+          SNAPSHOT_PATH: ${{ steps.before.outputs.path }}
+        run: test -f "$SNAPSHOT_PATH"
+
+      # Nothing happened between these, so there should be nothing to show.
+      - name: Diff two snapshots of the same thing
+        uses: ./snapshot-diff
+        with:
+          title: Two snapshots of the same thing
+          from: before
+          to: ${{ steps.again.outputs.path }}
+          fail-on-changes: 'true'
+
+      - name: Apply the second configuration
+        working-directory: tests/terraform
+        run: locally run terraform apply -auto-approve -var environment=two -var 'containers=["beta"]'
+
+      - id: live
+        name: Diff a snapshot against what's in Locally now
+        uses: ./snapshot-diff
+        with:
+          title: What the second configuration changed
+          from: before
+
+      - uses: ./snapshot-save
+        with:
+          name: after
+          upload: artifact
+          artifact-name: locally-snapshot-after-${{ matrix.os }}
+
+      # The passphrase is in the open as nothing in this instance is worth
+      # protecting: a real one comes from a secret.
+      - id: encrypted
+        uses: ./snapshot-save
+        with:
+          name: encrypted
+          passphrase: example-passphrase
+          upload: artifact
+
+      - id: failing
+        name: Check fail-on-changes fails
+        continue-on-error: true
+        uses: ./snapshot-diff
+        with:
+          from: before
+          to: after
+          job-summary: 'false'
+          fail-on-changes: 'true'
+
+      - name: Check the differences
+        env:
+          JSON: ${{ steps.live.outputs.json-path }}
+          HAS_CHANGES: ${{ steps.live.outputs.has-changes }}
+          RESOURCES_ADDED: ${{ steps.live.outputs.resources-added }}
+          RESOURCES_CHANGED: ${{ steps.live.outputs.resources-changed }}
+          RESOURCES_REMOVED: ${{ steps.live.outputs.resources-removed }}
+          DATA_ADDED: ${{ steps.live.outputs.data-added }}
+          DATA_REMOVED: ${{ steps.live.outputs.data-removed }}
+          FAILING: ${{ steps.failing.outcome }}
+        run: |
+          set -uo pipefail
+          failed=0
+          expect() { # what, expected, actual
+            if [ "$2" != "$3" ]; then
+              echo "::error::expected $1 to be '$2', got '$3'"
+              failed=1
+            fi
+          }
+          expect has-changes true "$HAS_CHANGES"
+          # Container "beta" replaces "alpha", and the storage account's tag changes.
+          expect resources-added 1 "$RESOURCES_ADDED"
+          expect resources-removed 1 "$RESOURCES_REMOVED"
+          expect resources-changed 1 "$RESOURCES_CHANGED"
+          expect data-added 1 "$DATA_ADDED"
+          expect data-removed 1 "$DATA_REMOVED"
+          expect "the outcome of the fail-on-changes diff" failure "$FAILING"
+
+          tag="$(jq -c '[.resources[] | select(.type == "Microsoft.Storage/storageAccounts") | .changes[]? | select(.path == "tags.environment") | [.before, .after]] | first' "$JSON")"
+          expect "the storage account's tags.environment change" '["one","two"]' "$tag"
+          exit "$failed"
+
+      # By name: the second configuration's changes are gone again.
+      - name: Load the first snapshot
+        uses: ./snapshot-load
+        with:
+          snapshot: before
+
+      - name: Check loading it put Locally back as it was
+        uses: ./snapshot-diff
+        with:
+          title: After loading the first snapshot
+          from: before
+          fail-on-changes: 'true'
+
+      # From the folder an artifact is downloaded to, as another workflow
+      # would load it.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ steps.encrypted.outputs.artifact-name }}
+          path: ${{ runner.temp }}/locally-snapshot
+
+      - name: Load the encrypted snapshot from the artifact's folder
+        uses: ./snapshot-load
+        with:
+          snapshot: ${{ runner.temp }}/locally-snapshot
+          passphrase: example-passphrase
+
+      # It was taken straight after `after`, so it should match it.
+      - name: Check loading it brought the second configuration back
+        uses: ./snapshot-diff
+        with:
+          title: After loading the encrypted snapshot
+          from: after
+          fail-on-changes: 'true'
+
+      - uses: ./teardown
+        if: always()
+
+  # Diffs the artifacts the jobs above uploaded, which is how a workflow
+  # compares snapshots taken in different jobs or runs.
+  snapshot-artifacts:
+    name: diff snapshot artifacts
+    needs: snapshots
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      id-token: write # required: Locally signs in using GitHub's OIDC token
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./
+        with:
+          team-uuid: ${{ vars.LOCALLY_TEAM_UUID }}
+          plugins: none
+          cache: 'false'
+
+      - id: diff
+        uses: ./snapshot-diff
+        with:
+          title: What the second test configuration changed (from artifacts)
+          from: locally-snapshot-before-ubuntu-latest
+          from-source: artifact
+          to: locally-snapshot-after-ubuntu-latest
+          to-source: artifact
+          # Pull requests from forks get a read-only token.
+          comment: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          comment-key: test-artifacts
+
+      - name: Check there were differences
+        env:
+          HAS_CHANGES: ${{ steps.diff.outputs.has-changes }}
+        run: |
+          if [ "$HAS_CHANGES" != "true" ]; then
+            echo "::error::expected the artifacts to differ, got has-changes='$HAS_CHANGES'"
+            exit 1
+          fi
+
+      - uses: ./teardown
+        if: always()
