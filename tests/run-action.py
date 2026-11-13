@@ -38,6 +38,7 @@ def main():
     base_env = dict(os.environ, RUNNER_TEMP=runner_temp, RUNNER_OS=platform,
                     GITHUB_RUN_ID="1", GITHUB_RUN_ATTEMPT="1",
                     GITHUB_REPOSITORY=github["repository"],
+                    GITHUB_SERVER_URL=os.environ.get("GITHUB_SERVER_URL", "https://github.com"),
                     GITHUB_STEP_SUMMARY=os.path.join(runner_temp, "summary.md"))
 
     steps = {}
