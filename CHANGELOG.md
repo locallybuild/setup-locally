@@ -11,6 +11,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `snapshot-load`, which replaces everything in Locally with a snapshot, using `locally snapshot load`. The snapshot can be one on the runner (by name, by path, or the one in a folder a workflow artifact was downloaded to) or one shared with your Locally Team.
 - `snapshot-diff`, which compares two snapshots - or a snapshot with what's in Locally now - with `locally snapshot diff`, where each side can be a snapshot on the runner, a workflow artifact (from this run, another run or the latest on a branch) or one shared with your Locally Team. The differences are written to the job summary, and optionally as a pull request comment that's updated in place.
 
+### Fixed
+- `setup-locally` now fails as soon as `locally ci` exits during startup, showing its log. Previously it kept waiting for Locally to become ready for the full 120 seconds.
+
 ## 1.0.3 (2026-11-04)
 
 ### Fixed

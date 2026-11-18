@@ -349,12 +349,20 @@ runs:
       run: |
         set -euo pipefail
         nohup locally ci > "$LOCALLY_WORKING_DIRECTORY/ci.log" 2>&1 &
-        echo $! > "$LOCALLY_WORKING_DIRECTORY/ci.pid"
+        ci_pid=$!
+        echo "$ci_pid" > "$LOCALLY_WORKING_DIRECTORY/ci.pid"
 
         for _ in $(seq 1 60); do
           if curl -fsSk -A "setup-locally/1.0.0" https://127.0.0.1:5674/_locally/ci/endpoints > /dev/null 2>&1; then
             echo "Locally CI is ready"
             exit 0
+          fi
+          # Stop as soon as `locally ci` has exited, rather than polling for
+          # the rest of the 120s - it won't become ready.
+          if ! kill -0 "$ci_pid" 2> /dev/null; then
+            echo "::error::Locally CI exited before it became ready"
+            cat "$LOCALLY_WORKING_DIRECTORY/ci.log" >&2 || true
+            exit 1
           fi
           sleep 2
         done
