@@ -1,0 +1,93 @@
+{
+  "from": {
+    "name": "after",
+    "createdAt": "2026-11-18T07:18:39.4338869Z"
+  },
+  "to": {
+    "live": true,
+    "createdAt": "2026-11-18T07:19:10.3945862Z"
+  },
+  "skipped": [
+    "author/signing_keys",
+    "bigbrain/auth_tokens",
+    "postie/eventgrid_events",
+    "postie/eventgrid_sequences",
+    "woodchuck/activity_log"
+  ],
+  "resources": [
+    {
+      "action": "removed",
+      "id": "/subscriptions/c8b200a5-168e-4a34-b439-4076c2c08f57/resourceGroups/snapdiff-rg/providers/Microsoft.Storage/storageAccounts/snapdiffsa",
+      "type": "Microsoft.Storage/storageAccounts"
+    },
+    {
+      "action": "removed",
+      "id": "/subscriptions/c8b200a5-168e-4a34-b439-4076c2c08f57/resourceGroups/snapdiff-rg/providers/Microsoft.Storage/storageAccounts/snapdiffsa/blobServices/default/containers/beta",
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers"
+    },
+    {
+      "action": "added",
+      "id": "/subscriptions/f1bf936c-1045-4ccd-85f5-d416f49de97e/resourceGroups/snapdiff-rg/providers/Microsoft.Storage/storageAccounts/snapdiffsa",
+      "type": "Microsoft.Storage/storageAccounts"
+    },
+    {
+      "action": "added",
+      "id": "/subscriptions/f1bf936c-1045-4ccd-85f5-d416f49de97e/resourceGroups/snapdiff-rg/providers/Microsoft.Storage/storageAccounts/snapdiffsa/blobServices/default/containers/beta",
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers"
+    }
+  ],
+  "data": [
+    {
+      "component": "bigbrain",
+      "type": "subscriptions",
+      "changes": [
+        {
+          "action": "added",
+          "key": "4ae86617-728e-4ac2-9bdb-9349df25b57a/05c64d57-a430-40bd-a6b7-537154250fee"
+        },
+        {
+          "action": "added",
+          "key": "4ae86617-728e-4ac2-9bdb-9349df25b57a/d9e3063e-7e83-4684-845a-910398a9b753"
+        },
+        {
+          "action": "added",
+          "key": "4ae86617-728e-4ac2-9bdb-9349df25b57a/f1bf936c-1045-4ccd-85f5-d416f49de97e"
+        },
+        {
+          "action": "removed",
+          "key": "9c75dffe-0a15-475a-9da8-8cb9dbfec422/5942f68a-8a5e-437f-88dc-bb243edbfae7"
+        },
+        {
+          "action": "removed",
+          "key": "9c75dffe-0a15-475a-9da8-8cb9dbfec422/9c148861-01a2-4b8c-bbde-d232e3444a7a"
+        },
+        {
+          "action": "removed",
+          "key": "9c75dffe-0a15-475a-9da8-8cb9dbfec422/c8b200a5-168e-4a34-b439-4076c2c08f57"
+        }
+      ]
+    },
+    {
+      "component": "bigbrain",
+      "type": "tenants",
+      "changes": [
+        {
+          "action": "added",
+          "key": "/tenants/4ae86617-728e-4ac2-9bdb-9349df25b57a"
+        },
+        {
+          "action": "removed",
+          "key": "/tenants/9c75dffe-0a15-475a-9da8-8cb9dbfec422"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "resourcesAdded": 2,
+    "resourcesChanged": 0,
+    "resourcesRemoved": 2,
+    "dataAdded": 4,
+    "dataChanged": 0,
+    "dataRemoved": 4
+  }
+}
