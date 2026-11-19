@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## Unreleased
+## 1.2.0 (2026-11-19)
 
 ### Changed
 - `snapshot-save` now names the artifact `locally-snapshot-<name>-<job id>` by default, with the matrix index appended for each leg of a matrix job. Previously every job used `locally-snapshot-<name>`. GitHub allows two artifacts in a run to share a name, so a matrix job could download and load another leg's snapshot. If you download a snapshot artifact by its default name, use the new name, or set `artifact-name`.
