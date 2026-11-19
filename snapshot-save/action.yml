@@ -35,7 +35,10 @@ inputs:
         team     — share it with your Locally Team (requires the Team plan)
     default: 'none'
   artifact-name:
-    description: The workflow artifact's name when `upload` includes `artifact`. Defaults to `locally-snapshot-<name>`.
+    description: |
+      The workflow artifact's name when `upload` includes `artifact`. Defaults
+      to `locally-snapshot-<name>-<job id>`, with the matrix index appended
+      (`-0`, `-1`, ...) for each leg of a matrix job.
     default: ''
   artifact-retention-days:
     description: How many days to keep the workflow artifact for. Defaults to the repository's setting.
@@ -76,6 +79,11 @@ runs:
         ARTIFACT_NAME: ${{ inputs.artifact-name }}
         ARTIFACT_OVERWRITE: ${{ inputs.artifact-overwrite }}
         TEAM: ${{ inputs.team }}
+        # Artifact names have to be unique within a run, but GitHub doesn't
+        # enforce that: two artifacts can share a name, and downloading by
+        # it gets either of them. So by default each job (and each leg of a
+        # matrix job) gets a name of its own.
+        JOB_SUFFIX: ${{ github.job }}${{ strategy.job-total > 1 && format('-{0}', strategy.job-index) || '' }}
       run: |
         set -euo pipefail
         # GitHub doesn't enforce `required` for a composite action.
@@ -116,7 +124,7 @@ runs:
           echo "artifact=$artifact"
           echo "team=$team"
           if [ "$artifact" = "true" ]; then
-            echo "artifact-name=${ARTIFACT_NAME:-locally-snapshot-$name}"
+            echo "artifact-name=${ARTIFACT_NAME:-locally-snapshot-$name-$JOB_SUFFIX}"
           fi
         } >> "$GITHUB_OUTPUT"
 

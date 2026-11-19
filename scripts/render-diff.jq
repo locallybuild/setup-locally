@@ -178,6 +178,20 @@ def data_details:
             + " |" ])
     + "\n\n</details>";
 
+# Each Locally instance has its own tenant and subscription IDs, which are in
+# the ID of almost everything it holds. So when the two sides come from
+# different instances (e.g. a snapshot uploaded by another job), everything
+# shows as removed from one tenant and added to another - which is worth
+# saying, as otherwise it looks like everything changed.
+def other_instance:
+  [(.data // [])[] | select(.type == "tenants") | .changes[]?.action] as $actions
+  | ($actions | any(. == "added")) and ($actions | any(. == "removed"));
+def notes:
+  (.notes // [])
+  + (if other_instance then
+       ["These snapshots seem to come from different Locally instances, as their tenants differ. Each instance has its own tenant and subscription IDs, so everything shows as removed and added again, even when both hold the same resources."]
+     else [] end);
+
 def resource_count: (.resources // []) | length;
 def is_empty: resource_count == 0 and data_count == 0;
 
@@ -237,8 +251,8 @@ def footer:
   (if $marker != "" then $marker else empty end),
   "### " + ($title | esc),
   headline,
-  (if ((.notes // []) | length) > 0 then
-     "> [!WARNING]\n" + ([.notes[] | "> " + esc] | join("\n>\n"))
+  (notes as $notes | if ($notes | length) > 0 then
+     "> [!WARNING]\n" + ([$notes[] | "> " + esc] | join("\n>\n"))
    else empty end),
   (if resource_count > 0 then resource_table else empty end),
   (if is_empty then empty

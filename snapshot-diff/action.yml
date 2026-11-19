@@ -369,6 +369,12 @@ runs:
           echo "json-path=$json"
         } >> "$GITHUB_OUTPUT"
 
+        # Each Locally instance has its own tenant and subscription IDs, so
+        # snapshots from different instances differ in everything.
+        if jq -e '[(.data // [])[] | select(.type == "tenants") | .changes[]?.action] | any(. == "added") and any(. == "removed")' "$json" > /dev/null; then
+          echo "::warning::These snapshots seem to come from different Locally instances, as their tenants differ. Each instance has its own tenant and subscription IDs, so everything shows as removed and added again, even when both hold the same resources. A snapshot uploaded as an artifact by another job (or matrix leg) is from another instance."
+        fi
+
         jq -r '.summary | "Resources: \(.resourcesAdded) added, \(.resourcesChanged) changed, \(.resourcesRemoved) removed. Data: \(.dataAdded) added, \(.dataChanged) changed, \(.dataRemoved) removed."' "$json"
 
     - name: Upload the diff

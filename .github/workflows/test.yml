@@ -248,6 +248,18 @@ jobs:
           passphrase: example-passphrase
           upload: artifact
 
+      # Left to its default, the artifact's name has to differ between this
+      # job's matrix legs, or each could download the other's.
+      - name: Check the default artifact name is per matrix leg
+        env:
+          ARTIFACT_NAME: ${{ steps.encrypted.outputs.artifact-name }}
+          EXPECTED: locally-snapshot-encrypted-${{ github.job }}-${{ strategy.job-index }}
+        run: |
+          if [ "$ARTIFACT_NAME" != "$EXPECTED" ]; then
+            echo "::error::expected the artifact to be named '$EXPECTED', got '$ARTIFACT_NAME'"
+            exit 1
+          fi
+
       - id: failing
         name: Check fail-on-changes fails
         continue-on-error: true

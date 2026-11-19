@@ -179,12 +179,12 @@ The full list of arguments:
 | `passphrase` | no | `''` | Encrypt the snapshot with this passphrase, passed in from a secret |
 | `timeout` | no | `''` | Give up if running operations haven't finished within this time (e.g. `5m`) - defaults to waiting |
 | `upload` | no | `none` | Any of `none` (keep it on the runner only), `artifact` (a workflow artifact) and `team` (share it with your Locally Team), comma- or newline-separated |
-| `artifact-name` | no | `locally-snapshot-<name>` | The workflow artifact's name, when `upload` includes `artifact` |
+| `artifact-name` | no | `locally-snapshot-<name>-<job id>` | The workflow artifact's name, when `upload` includes `artifact` - with the matrix index appended (`-0`, `-1`, ...) for each leg of a matrix job |
 | `artifact-retention-days` | no | repository setting | How many days to keep the artifact for |
 | `artifact-overwrite` | no | `false` | Replace an artifact of the same name from earlier in this run |
 | `team` | no | `''` | The Locally Team to share with, when `upload` includes `team` and you're in more than one |
 
-Artifact names have to be unique within a run, so when more than one job uploads a snapshot, give each a different `name` (or `artifact-name`).
+Artifact names have to be unique within a run, but GitHub doesn't enforce this: if two jobs upload an artifact with the same name, downloading it by that name can return either one. The default name includes the job ID and matrix index to avoid this. When you set `artifact-name` yourself in a matrix job, include the matrix values, e.g. `locally-snapshot-before-${{ matrix.os }}`. To pass the snapshot to a later job, use the `artifact-name` output, so that you don't have to work the name out.
 
 Outputs: `name`, `path` (of the snapshot file on the runner), `artifact-name`, `artifact-id` and `artifact-url`.
 
